@@ -238,3 +238,28 @@ src/
 - Temporal correlation is not presented as causation.
 - AI failure does not block manual records, timelines or deterministic analytics.
 - API routes require an authenticated session.
+
+## Groq AI setup (recommended for the hackathon)
+
+PeachyPawz is provider-aware. Deterministic timelines, trends, baselines, evidence, and vet prep work without an LLM. Groq is used only for optional narrative/chat and image-document extraction.
+
+Add these server-side environment variables locally in `.env.local` and in Vercel Project → Settings → Environment Variables:
+
+```env
+AI_PROVIDER=groq
+GROQ_API_KEY=your_groq_key
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_VISION_MODEL=qwen/qwen3.6-27b
+```
+
+Never expose `GROQ_API_KEY` in browser code or prefix it with `NEXT_PUBLIC_`.
+
+The app uses Groq through its OpenAI-compatible API endpoint, so the existing `openai` npm client remains the transport library. If Groq is temporarily unavailable, health story/chat fall back to deterministic evidence-grounded responses and image imports remain reviewable manually.
+
+To switch back to OpenAI later:
+
+```env
+AI_PROVIDER=openai
+OPENAI_API_KEY=your_key
+OPENAI_MODEL=gpt-5
+```

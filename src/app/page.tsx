@@ -1,6 +1,7 @@
 import PeachyApp from "@/components/PeachyApp";
 import LoginScreen from "@/components/LoginScreen";
 import { auth, signIn, signOut } from "@/auth";
+import { isAIConfigured } from "@/lib/ai/provider";
 
 export default async function Page() {
   const googleConfigured = Boolean(process.env.AUTH_SECRET && process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
@@ -24,7 +25,7 @@ export default async function Page() {
   return (
     <PeachyApp
       user={{ id, name: session.user.name, email: session.user.email, image: session.user.image }}
-      aiAvailable={Boolean(process.env.OPENAI_API_KEY)}
+      aiAvailable={isAIConfigured()}
       signOutAction={signOutAction}
     />
   );
