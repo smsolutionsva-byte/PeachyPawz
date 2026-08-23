@@ -44,7 +44,11 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     let extraction;
-    if (file.type === "application/pdf") extraction = heuristicExtract(await extractPdf(buffer));
+    let documentText = "";
+    if (file.type === "application/pdf") {
+      documentText = await extractPdf(buffer);
+      extraction = heuristicExtract(documentText);
+    }
     else if (file.type.startsWith("image/")) extraction = (allowAI ? await aiExtractImage(buffer, file.type) : null) ?? extractionSchema.parse({
       petName: null,
       documentType: "unknown",
@@ -57,9 +61,24 @@ export async function POST(request: Request) {
       confidence: "limited",
       warnings: [allowAI ? "AI image extraction is unavailable; review manually." : "AI analysis was not enabled; review manually."],
     });
-    else extraction = heuristicExtract(buffer.toString("utf8"));
+    else {
+      documentText = buffer.toString("utf8");
+      extraction = heuristicExtract(documentText);
+    }
 
-    return NextResponse.json({ filename: file.name, extraction, requiresReview: true, source: "document_ai" });
+    if (!documentText && extraction) {
+      documentText = [
+        extraction.petName ? `Pet: ${extraction.petName}` : "",
+        extraction.date ? `Date: ${extraction.date}` : "",
+        extraction.clinic ? `Clinic: ${extraction.clinic}` : "",
+        extraction.weight ? `Weight: ${extraction.weight.value} ${extraction.weight.unit}` : "",
+        extraction.medications?.length ? `Medications: ${extraction.medications.map((m) => [m.name, m.dose, m.frequency].filter(Boolean).join(" ")).join("; ")}` : "",
+        extraction.followUp ? `Follow-up: ${extraction.followUp}` : "",
+        extraction.notes ? `Notes: ${extraction.notes}` : "",
+      ].filter(Boolean).join("\n");
+    }
+
+    return NextResponse.json({ filename: file.name, extraction, documentText: documentText.slice(0, 8000), requiresReview: true, source: "document_ai" });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Document extraction failed." }, { status: 500 });
   }

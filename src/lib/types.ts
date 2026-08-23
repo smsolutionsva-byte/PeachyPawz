@@ -86,4 +86,19 @@ export type ChatAnswer = {
   answer: string;
   evidenceIds: string[];
   caution?: string;
+  memory?: {
+    recentTurns: number;
+    recalledTurns: number;
+    retrievedRecords: number;
+  };
+};
+
+
+export type ChatTurn = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  createdAt: string;
+  scope?: "pet-records" | "general";
+  evidenceIds?: string[];
 };

@@ -218,3 +218,19 @@ Disconnect should revoke local tokens and clearly define whether imported histor
 - Cache reports by evidence hash.
 - Background queues for large documents and connected-source sync.
 - Virtualize large timeline lists on mobile.
+
+
+## Conversational memory and retrieval
+
+```text
+Current question
+   ├─ Recent chat turns (short-term continuity)
+   ├─ Relevant older turns (conversation recall)
+   └─ Pet-scoped timeline/document retrieval (source of truth)
+                     ↓
+             Evidence-grounded AI
+                     ↓
+        Answer + validated evidence IDs
+```
+
+The conversation layer deliberately separates *memory* from *evidence*. Old user/assistant turns help resolve references such as “that report” or “before that,” but cannot establish a pet-health fact. The system must re-ground pet-specific claims in the selected pet's current reviewed records. In the browser prototype chat history is stored per account/pet in localStorage; production should store it server-side with authorization, retention/deletion controls, encryption, and hybrid retrieval.

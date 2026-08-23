@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { analyzePet, evidenceFor, metricSeries } from "@/lib/analytics";
 import { pets as demoPets, seedEvents as demoEvents } from "@/lib/seed";
-import { AnalyticsResult, ChatAnswer, EventType, HealthEvent, Pet } from "@/lib/types";
+import { AnalyticsResult, ChatAnswer, ChatTurn, EventType, HealthEvent, Pet } from "@/lib/types";
 import { EventIcon } from "./EventIcon";
 import { Sparkline } from "./Sparkline";
 
@@ -165,7 +165,12 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
     setView("home");
   };
   const resetProfile = () => {
-    try { localStorage.removeItem(storageKey); } catch {}
+    try {
+      localStorage.removeItem(storageKey);
+      const chatPrefix = `peachypawz:chat:v1:${encodeURIComponent(user.id)}:`;
+      const chatKeys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter((key): key is string => Boolean(key?.startsWith(chatPrefix)));
+      chatKeys.forEach((key) => localStorage.removeItem(key));
+    } catch {}
     setUserPets([]);
     setEvents([]);
     setSelectedPetId("");
@@ -237,7 +242,7 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
           )}
           {view === "timeline" && <TimelineView pet={pet} events={petEvents} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} />}
           {view === "insights" && <InsightsView pet={pet} analytics={analytics} events={petEvents} onEvidence={setEvidenceIds} onStory={() => setStoryOpen(true)} />}
-          {view === "ask" && <AskView pet={pet} events={petEvents} allowAI={aiConsent && aiAvailable} />}
+          {view === "ask" && <AskView pet={pet} events={petEvents} allowAI={aiConsent && aiAvailable} storageKey={`peachypawz:chat:v1:${encodeURIComponent(user.id)}:${pet.id}`} />}
         </section>
       </main>
 
@@ -495,26 +500,98 @@ function InsightsView({ pet, analytics, events, onEvidence, onStory }: { pet: Pe
   return <div className="page-stack narrow-page"><div className="page-intro"><div><span className="section-kicker"><Sparkles size={15} /> Explainable intelligence</span><h2>Insights for {pet.name}</h2><p>Ranked by evidence strength, magnitude and persistence — not fear.</p></div></div><section className="insights-feature"><div className="insights-feature-top"><span className="status-pill changes"><span /> Changes detected</span><span className="confidence-pill">{analytics.primaryInsight.confidence}</span></div><h3>{analytics.primaryInsight.title}</h3><p>{analytics.primaryInsight.summary}</p><div className="insight-evidence-summary"><strong>Evidence bundle</strong><span>{analytics.primaryInsight.evidenceIds.length} linked records</span><span>{formatDate(analytics.primaryInsight.timeRange.start)} — {formatDate(analytics.primaryInsight.timeRange.end)}</span></div><button className="button dark" onClick={() => onEvidence(analytics.primaryInsight.evidenceIds)}><FileSearch size={16} /> Inspect evidence</button></section><section className="section-block surface"><div className="section-heading"><div><span className="section-kicker">Baseline deviations</span><h2>What is unusual for {pet.name}?</h2></div></div><div className="baseline-list">{analytics.baselines.map((baseline) => <div key={baseline.metric}><div className={`metric-icon ${baseline.metric}`}><EventIcon type={baseline.metric} /></div><span><strong>{eventLabels[baseline.metric]}</strong><small>{baseline.explanation}</small></span><span className="baseline-range">{baseline.min ?? "—"}–{baseline.max ?? "—"} {baseline.unit}</span></div>)}</div></section><section className="section-block surface story-teaser"><div><span className="section-kicker"><Bot size={15} /> Narrative layer</span><h2>Turn the data into a health story</h2><p>AI receives structured analytics and evidence, then explains the timeline in cautious language.</p></div><button className="button primary" onClick={onStory}>Generate story <Sparkles size={16} /></button></section></div>;
 }
 
-function AskView({ pet, events, allowAI }: { pet: Pet; events: HealthEvent[]; allowAI: boolean }) {
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string; answer?: ChatAnswer & { mode?: string } }>>([{ role: "assistant", text: `Ask me about ${pet.name}'s timeline. I’ll separate record-based answers from general information.` }]);
+type ChatMessage = ChatTurn & { answer?: ChatAnswer & { mode?: string } };
+
+function AskView({ pet, events, allowAI, storageKey }: { pet: Pet; events: HealthEvent[]; allowAI: boolean; storageKey: string }) {
+  const greeting = (): ChatMessage => ({
+    id: `welcome-${pet.id}`,
+    role: "assistant",
+    text: `Ask me about ${pet.name}'s timeline. I can remember this conversation and re-check older records or imported documents when you bring them up again.`,
+    createdAt: new Date().toISOString(),
+  });
+  const [messages, setMessages] = useState<ChatMessage[]>([greeting()]);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
-  useEffect(() => { setMessages([{ role: "assistant", text: `Ask me about ${pet.name}'s timeline. I’ll separate record-based answers from general information.` }]); }, [pet.id, pet.name]);
+  const [chatHydrated, setChatHydrated] = useState(false);
 
-  const send = async (text: string) => {
-    const q = text.trim(); if (!q || loading) return;
-    setMessages((current) => [...current, { role: "user", text: q }]); setQuestion(""); setLoading(true);
+  useEffect(() => {
+    setChatHydrated(false);
     try {
-      const res = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "chat", pet, events, question: q, allowAI }) });
-      const answer = await res.json();
-      setMessages((current) => [...current, { role: "assistant", text: answer.answer || "I couldn't answer from the available records.", answer }]);
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length) {
+          setMessages(parsed.slice(-120));
+        } else {
+          setMessages([greeting()]);
+        }
+      } else {
+        setMessages([greeting()]);
+      }
     } catch {
-      setMessages((current) => [...current, { role: "assistant", text: "AI insights are temporarily unavailable. Your timeline records are still available." }]);
-    } finally { setLoading(false); }
+      setMessages([greeting()]);
+    }
+    setChatHydrated(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey, pet.id, pet.name]);
+
+  useEffect(() => {
+    if (!chatHydrated) return;
+    try { localStorage.setItem(storageKey, JSON.stringify(messages.slice(-120))); } catch {}
+  }, [chatHydrated, messages, storageKey]);
+
+  const clearChat = () => {
+    const first = greeting();
+    setMessages([first]);
+    try { localStorage.setItem(storageKey, JSON.stringify([first])); } catch {}
   };
 
-  const chips = ["When did activity decline begin?", `How has ${pet.name}'s weight changed?`, "Summarize the available records.", "What happened at the last vet visit?"];
-  return <div className="ask-layout"><section className="chat-panel"><div className="chat-header"><span className="ai-orb large"><Bot size={22} /></span><div><h2>Ask about {pet.name}</h2><p>{allowAI ? "AI explanation + deterministic evidence" : "Deterministic timeline answers · AI consent off"}</p></div></div><div className="chat-messages">{messages.map((message, index) => <div className={`chat-message ${message.role}`} key={index}>{message.role === "assistant" && <span className="chat-avatar"><Bot size={16} /></span>}<div className="bubble">{message.answer && <span className={`scope-badge ${message.answer.scope}`}>{message.answer.scope === "pet-records" ? `Based on ${pet.name}'s records` : "General information"}</span>}<p>{message.text}</p>{message.answer?.evidenceIds?.length ? <small>{message.answer.evidenceIds.length} evidence record{message.answer.evidenceIds.length > 1 ? "s" : ""} linked · {message.answer.mode === "llm" ? "AI explanation" : "deterministic answer"}</small> : null}</div></div>)}{loading && <div className="chat-message assistant"><span className="chat-avatar"><Bot size={16} /></span><div className="bubble typing"><i/><i/><i/></div></div>}</div><div className="prompt-chips">{chips.map((chip) => <button onClick={() => send(chip)} key={chip}>{chip}</button>)}</div><form className="chat-input" onSubmit={(e) => { e.preventDefault(); send(question); }}><input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={`Ask about ${pet.name}'s records…`} /><button disabled={!question.trim() || loading}><ArrowUpRight size={18} /></button></form></section><aside className="chat-trust"><ShieldCheck size={22} /><h3>How answers stay grounded</h3><ul><li>Pet ID filter prevents cross-pet retrieval.</li><li>Calculations happen before AI narration.</li><li>Evidence IDs are validated against retrieved records.</li><li>Diagnosis and medication-change language is blocked.</li><li>Imported document text is treated as untrusted data.</li></ul></aside></div>;
+  const send = async (text: string) => {
+    const q = text.trim();
+    if (!q || loading) return;
+    const userTurn: ChatMessage = { id: `user-${Date.now()}`, role: "user", text: q, createdAt: new Date().toISOString() };
+    const historyForRequest: ChatTurn[] = [...messages, userTurn].slice(-120).map(({ id, role, text, createdAt, answer }) => ({
+      id,
+      role,
+      text,
+      createdAt,
+      scope: answer?.scope,
+      evidenceIds: answer?.evidenceIds,
+    }));
+    setMessages((current) => [...current, userTurn]);
+    setQuestion("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "chat", pet, events, question: q, allowAI, history: historyForRequest }),
+      });
+      const answer = await res.json();
+      const assistantTurn: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        text: answer.answer || "I couldn't verify that from the available records.",
+        answer,
+        createdAt: new Date().toISOString(),
+        scope: answer.scope,
+        evidenceIds: answer.evidenceIds,
+      };
+      setMessages((current) => [...current, assistantTurn]);
+    } catch {
+      setMessages((current) => [...current, {
+        id: `assistant-error-${Date.now()}`,
+        role: "assistant",
+        text: "AI explanation is temporarily unavailable. Your timeline and this chat history are still saved in this browser.",
+        createdAt: new Date().toISOString(),
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const chips = ["Explain all unusual changes", "What did that earlier report say?", "When did activity decline begin?", `How has ${pet.name}'s weight changed?`];
+  return <div className="ask-layout"><section className="chat-panel"><div className="chat-header"><span className="ai-orb large"><Bot size={22} /></span><div className="chat-header-copy"><h2>Ask about {pet.name}</h2><p>{allowAI ? "Conversational memory + fresh timeline retrieval" : "Conversation saved · deterministic answers · AI consent off"}</p></div><button className="chat-new-button" onClick={clearChat} disabled={loading} title="Start a new conversation">New chat</button></div><div className="chat-messages">{messages.map((message) => <div className={`chat-message ${message.role}`} key={message.id}>{message.role === "assistant" && <span className="chat-avatar"><Bot size={16} /></span>}<div className="bubble">{message.answer && <span className={`scope-badge ${message.answer.scope}`}>{message.answer.scope === "pet-records" ? `Based on ${pet.name}'s records` : "General information"}</span>}<p>{message.text}</p>{message.answer && <small>{message.answer.evidenceIds?.length ? `${message.answer.evidenceIds.length} evidence record${message.answer.evidenceIds.length > 1 ? "s" : ""} linked` : "No record citation needed"}{message.answer.memory?.recalledTurns ? ` · recalled ${message.answer.memory.recalledTurns} older chat turn${message.answer.memory.recalledTurns > 1 ? "s" : ""}` : ""}{message.answer.memory?.retrievedRecords ? ` · checked ${message.answer.memory.retrievedRecords} timeline record${message.answer.memory.retrievedRecords > 1 ? "s" : ""}` : ""}</small>}</div></div>)}{loading && <div className="chat-message assistant"><span className="chat-avatar"><Bot size={16} /></span><div className="bubble typing"><i/><i/><i/></div></div>}</div><div className="prompt-chips">{chips.map((chip) => <button onClick={() => send(chip)} key={chip}>{chip}</button>)}</div><form className="chat-input" onSubmit={(e) => { e.preventDefault(); send(question); }}><input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={`Ask naturally — “what about before that?”…`} /><button disabled={!question.trim() || loading}><ArrowUpRight size={18} /></button></form></section><aside className="chat-trust"><ShieldCheck size={22} /><h3>Memory without making things up</h3><ul><li>Recent turns keep normal follow-ups coherent.</li><li>Older turns are retrieved when their topic becomes relevant again.</li><li>Uploaded document memory stays attached to {pet.name}'s timeline.</li><li>Conversation context can resolve references, but it is never treated as medical evidence.</li><li>Every pet-specific claim is re-checked against current records.</li></ul></aside></div>;
 }
 
 function EmptyState({ pet, eventCount, onAdd, onUpload, onDemo }: { pet: Pet; eventCount: number; onAdd: () => void; onUpload: () => void; onDemo: () => void }) {
@@ -546,7 +623,73 @@ function AddEventSheet({ pet, onAdd, onClose, onUpload }: { pet: Pet; onAdd: (ev
 function UploadSheet({ pet, allowAI, onAdd, onClose }: { pet: Pet; allowAI: boolean; onAdd: (event: HealthEvent) => void; onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null); const [result, setResult] = useState<any>(null); const [loading, setLoading] = useState(false); const [date, setDate] = useState(todayDate()); const [weight, setWeight] = useState("");
   const extract = async () => { if (!file) return; setLoading(true); const form = new FormData(); form.set("file", file); form.set("allowAI", String(allowAI)); try { const res = await fetch("/api/documents/extract", { method: "POST", body: form }); const data = await res.json(); if (!res.ok) throw new Error(data.error); setResult(data); setDate(data.extraction.date || todayDate()); setWeight(data.extraction.weight?.value?.toString() || ""); } catch (error) { setResult({ error: error instanceof Error ? error.message : "Extraction failed" }); } finally { setLoading(false); } };
-  const approve = () => { if (!result?.extraction) return; const extraction = result.extraction; if (weight) onAdd({ id: `doc-weight-${Date.now()}`, petId: pet.id, type: "weight", date, title: "Weight imported", summary: `${weight} ${extraction.weight?.unit || "kg"}`, data: { value: Number(weight), unit: extraction.weight?.unit || "kg" }, source: "document_ai", sourceLabel: result.filename, sourceDocumentId: `doc-${Date.now()}`, confidence: extraction.confidence, reviewStatus: "approved", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); onAdd({ id: `doc-visit-${Date.now()}`, petId: pet.id, type: extraction.documentType === "vaccination" ? "vaccine" : "vet", date, title: extraction.documentType === "vaccination" ? "Vaccination imported" : "Vet visit imported", summary: extraction.followUp || extraction.notes || `Imported from ${result.filename}`, data: { clinic: extraction.clinic || "Unknown", followUp: extraction.followUp || null }, source: "document_ai", sourceLabel: result.filename, sourceDocumentId: `doc-${Date.now()}`, confidence: extraction.confidence, reviewStatus: "approved", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); onClose(); };
+  const approve = () => {
+    if (!result?.extraction) return;
+    const extraction = result.extraction;
+    const stamp = Date.now();
+    const documentId = `doc-${stamp}`;
+    const createdAt = new Date().toISOString();
+    const documentMemory = String(result.documentText || extraction.notes || extraction.followUp || "").slice(0, 8000);
+
+    onAdd({
+      id: `doc-memory-${stamp}`,
+      petId: pet.id,
+      type: "document",
+      date,
+      title: result.filename || "Imported health document",
+      summary: extraction.notes || extraction.followUp || `Reviewed document imported for ${pet.name}`,
+      data: {
+        filename: result.filename || "health-document",
+        documentType: extraction.documentType || "unknown",
+        extractedText: documentMemory,
+        clinic: extraction.clinic || "",
+        followUp: extraction.followUp || "",
+        medicationText: extraction.medications?.map((m: any) => [m.name, m.dose, m.frequency].filter(Boolean).join(" ")).join("; ") || "",
+      },
+      source: "document_ai",
+      sourceLabel: result.filename,
+      sourceDocumentId: documentId,
+      confidence: extraction.confidence,
+      reviewStatus: "approved",
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    if (weight) onAdd({
+      id: `doc-weight-${stamp}`,
+      petId: pet.id,
+      type: "weight",
+      date,
+      title: "Weight imported",
+      summary: `${weight} ${extraction.weight?.unit || "kg"}`,
+      data: { value: Number(weight), unit: extraction.weight?.unit || "kg" },
+      source: "document_ai",
+      sourceLabel: result.filename,
+      sourceDocumentId: documentId,
+      confidence: extraction.confidence,
+      reviewStatus: "approved",
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    onAdd({
+      id: `doc-visit-${stamp}`,
+      petId: pet.id,
+      type: extraction.documentType === "vaccination" ? "vaccine" : "vet",
+      date,
+      title: extraction.documentType === "vaccination" ? "Vaccination imported" : "Vet visit imported",
+      summary: extraction.followUp || extraction.notes || `Imported from ${result.filename}`,
+      data: { clinic: extraction.clinic || "Unknown", followUp: extraction.followUp || null },
+      source: "document_ai",
+      sourceLabel: result.filename,
+      sourceDocumentId: documentId,
+      confidence: extraction.confidence,
+      reviewStatus: "approved",
+      createdAt,
+      updatedAt: createdAt,
+    });
+    onClose();
+  };
   const detectedName = result?.extraction?.petName?.trim();
   const nameMismatch = detectedName && detectedName.toLowerCase() !== pet.name.toLowerCase();
   return <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Upload size={15} /> Document intelligence</span><h2>Import a health record</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div>{!result?.extraction ? <><label className="drop-zone"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.txt" onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); }} /><span className="drop-icon"><FileText size={23} /></span><strong>{file ? file.name : "Choose a veterinary document"}</strong><p>PDF, JPG, PNG or TXT · max 8 MB</p><small>Nothing enters {pet.name}'s timeline until you review and approve it.</small></label>{result?.error && <div className="error-banner">{result.error}</div>}<button className="button primary full" onClick={extract} disabled={!file || loading}>{loading ? "Extracting…" : "Extract for review"}</button><div className="sample-tip"><FileSearch size={16} /><p>{allowAI ? "AI analysis is enabled for this import with your onboarding consent. PDF text still uses deterministic parsing where possible." : "AI analysis is off. Text-based PDF/TXT extraction still works; image files will require manual review."}</p></div></> : <div className="review-panel"><div className="review-banner"><ShieldCheck size={18} /><span><strong>Proposed fields — review required</strong><small>{result.extraction.confidence} confidence · {result.filename}</small></span></div>{result.extraction.warnings?.map((warning: string) => <div className="warning-line" key={warning}><Info size={15} /> {warning}</div>)}{nameMismatch && <div className="error-banner"><strong>Wrong-pet check:</strong> this document appears to mention “{detectedName}”, but you are importing into {pet.name}. Verify before approving.</div>}<label><span>Assign to pet</span><select value={pet.name} disabled><option>{pet.name}</option></select><small>The destination pet is explicit. PeachyPawz never silently reassigns a health record.</small></label><label><span>Visit date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label><span>Weight</span><div className="input-with-unit"><input value={weight} onChange={(e) => setWeight(e.target.value)} /><span>{result.extraction.weight?.unit || "kg"}</span></div></label><label><span>Clinic</span><input value={result.extraction.clinic || ""} readOnly /></label><label><span>Extracted note</span><textarea value={result.extraction.followUp || result.extraction.notes || ""} readOnly /></label><button className="button primary full" onClick={approve}><Check size={17} /> Approve & add to {pet.name}'s timeline</button><button className="button secondary full" onClick={() => setResult(null)}>Choose a different file</button></div>}</aside></div>;

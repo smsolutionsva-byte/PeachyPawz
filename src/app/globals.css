@@ -641,3 +641,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .home-insight-panel .insight-actions { flex-wrap: wrap; }
   .mobile-header .brand strong { font-size: 17px; }
 }
+
+/* Conversational memory */
+.chat-header-copy { min-width: 0; flex: 1; }
+.chat-new-button { border: 1px solid var(--line); background: #fff; color: var(--muted); border-radius: 10px; min-height: 34px; padding: 0 10px; font-size: 9px; font-weight: 750; cursor: pointer; white-space: nowrap; }
+.chat-new-button:hover { background: #f7f5f1; color: var(--ink); }
+.chat-new-button:disabled { opacity: .5; cursor: default; }
+.bubble p { white-space: pre-line; }
+
+@media (max-width: 700px) {
+  .chat-header { align-items: flex-start; }
+  .chat-new-button { min-height: 38px; }
+}
