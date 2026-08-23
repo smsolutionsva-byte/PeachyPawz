@@ -82,7 +82,7 @@ export type AnalyticsResult = {
 };
 
 export type ChatAnswer = {
-  scope: "pet-records" | "general";
+  scope: "pet-records" | "general" | "conversation";
   answer: string;
   evidenceIds: string[];
   caution?: string;
@@ -99,6 +99,6 @@ export type ChatTurn = {
   role: "user" | "assistant";
   text: string;
   createdAt: string;
-  scope?: "pet-records" | "general";
+  scope?: "pet-records" | "general" | "conversation";
   evidenceIds?: string[];
 };

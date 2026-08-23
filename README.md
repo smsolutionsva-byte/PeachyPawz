@@ -263,3 +263,11 @@ AI_PROVIDER=openai
 OPENAI_API_KEY=your_key
 OPENAI_MODEL=gpt-5
 ```
+
+## Conversational memory
+
+The Ask experience is stateful per signed-in user + pet in the prototype. PeachyPawz stores up to 120 chat turns locally, sends recent turns for natural follow-ups, retrieves older relevant turns by topic, and re-retrieves health records on every question. Conversation text is used only for continuity; it is never treated as medical evidence. Pet-specific claims must still be supported by current reviewed timeline records.
+
+Approved PDF/TXT/image imports now also create a searchable `document` timeline event containing bounded extracted text (up to 8,000 characters) plus provenance. This allows a user to return many turns later and ask about an older report without requiring the entire document to remain in the model context.
+
+For production, move chat history and document text from browser storage to encrypted server-side persistence (MongoDB/object storage), then replace lexical retrieval with hybrid metadata + semantic retrieval.

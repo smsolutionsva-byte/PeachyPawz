@@ -253,9 +253,64 @@ function retrieveTimelineMemory(events: HealthEvent[], pet: Pet, question: strin
     .slice(-36);
 }
 
+
+function isCasualConversation(question: string, history: ChatTurn[]) {
+  const q = question.toLowerCase().trim().replace(/[!?.,]+$/g, "").trim();
+  const compact = q.replace(/\s+/g, " ");
+  const exactCasual = new Set([
+    "hi", "hello", "hey", "heyy", "heyyy", "yo", "sup", "hiya", "howdy",
+    "thanks", "thank you", "ty", "thx", "cool", "nice", "great", "awesome", "okay", "ok",
+    "lol", "lmao", "haha", "hehe", "bye", "goodbye", "good night", "good morning", "good afternoon",
+  ]);
+  if (exactCasual.has(compact)) return true;
+  if (/^(hi|hello|hey|yo|sup)\b/.test(compact) && compact.split(" ").length <= 6) return true;
+  if (/^(thanks|thank you|ty|thx)\b/.test(compact) && compact.split(" ").length <= 8) return true;
+  if (/^(who are you|what can you do|can we chat|do you remember|can you remember|are you there)/.test(compact)) return true;
+
+  // A short pronoun-heavy follow-up should inherit a record conversation rather than being treated as small talk.
+  if (isFollowUp(question) && history.slice(-6).some((turn) => turn.scope === "pet-records")) return false;
+  return false;
+}
+
+function casualConversationAnswer(pet: Pet, question: string): ChatAnswer {
+  const q = question.toLowerCase().trim();
+  if (/^(hi|hello|hey|heyy|heyyy|yo|sup|hiya|howdy)\b/.test(q)) {
+    return { scope: "conversation", answer: `Hey 👋 I’m here. We can chat normally, or you can ask me anything about ${pet.name}'s timeline — including follow-ups from earlier in this conversation.`, evidenceIds: [] };
+  }
+  if (/^(thanks|thank you|ty|thx)\b/.test(q)) {
+    return { scope: "conversation", answer: "Anytime 🐾", evidenceIds: [] };
+  }
+  if (/^(bye|goodbye|good night)/.test(q)) {
+    return { scope: "conversation", answer: `See you later 👋 I’ll keep this conversation saved for ${pet.name} on this device.`, evidenceIds: [] };
+  }
+  if (/who are you/.test(q)) {
+    return { scope: "conversation", answer: `I’m PeachyPawz — a conversational assistant for ${pet.name}'s health timeline. I can chat normally, remember this thread, and re-check saved records when a health question comes up.`, evidenceIds: [] };
+  }
+  if (/what can you do/.test(q)) {
+    return { scope: "conversation", answer: `I can chat with you normally, explain ${pet.name}'s recorded changes, compare periods, recall earlier parts of this conversation, find old uploaded-record details, and prepare evidence-backed summaries for a vet visit.`, evidenceIds: [] };
+  }
+  if (/do you remember|can you remember/.test(q)) {
+    return { scope: "conversation", answer: `Yes — I keep this pet's recent conversation on this device and can recall relevant older turns. For health facts, I still re-check ${pet.name}'s saved timeline instead of treating chat memory as medical evidence.`, evidenceIds: [] };
+  }
+  return { scope: "conversation", answer: "Yep, I’m here 🐾 What’s up?", evidenceIds: [] };
+}
+
+function shouldUsePetRecords(pet: Pet, question: string, history: ChatTurn[]) {
+  const q = contextualQuestion(question, history).toLowerCase();
+  if (isFollowUp(question) && history.slice(-8).some((turn) => turn.scope === "pet-records")) return true;
+  const recordTerms = [
+    pet.name.toLowerCase(), "timeline", "record", "report", "document", "pdf", "upload", "vet", "visit",
+    "weight", "activity", "appetite", "eat", "diet", "food", "symptom", "medication", "medicine",
+    "vaccine", "vaccination", "lab", "blood", "test", "health", "abnormal", "unusual", "deviation",
+    "change", "changed", "pattern", "baseline", "before", "after", "follow-up", "follow up", "diagnos",
+  ];
+  return recordTerms.some((term) => q.includes(term));
+}
+
 function deterministicAnswer(pet: Pet, events: HealthEvent[], question: string, history: ChatTurn[] = []): ChatAnswer {
   const urgent = emergencyGuard(question);
   if (urgent) return { scope: "general", answer: urgent, evidenceIds: [], caution: "Urgent guidance" };
+  if (isCasualConversation(question, history)) return casualConversationAnswer(pet, question);
 
   const q = contextualQuestion(question, history).toLowerCase();
   const petEvents = events.filter((event) => event.petId === pet.id).sort((a, b) => a.date.localeCompare(b.date));
@@ -407,9 +462,17 @@ function deterministicAnswer(pet: Pet, events: HealthEvent[], question: string, 
     };
   }
 
+  if (!shouldUsePetRecords(pet, question, history)) {
+    return {
+      scope: "conversation",
+      answer: `I’m with you. We can chat normally, and if you bring up ${pet.name}'s health I’ll switch to the saved timeline and show what the records support.`,
+      evidenceIds: [],
+    };
+  }
+
   return {
     scope: "pet-records",
-    answer: `I can answer questions about ${pet.name}'s recorded weight, activity, appetite, medications, vet visits, diet changes, symptoms, and recent timeline. Try “When did activity decline begin?”`,
+    answer: `I couldn't confidently map that wording to a specific part of ${pet.name}'s timeline yet. You can phrase it naturally — for example, “what happened before the activity drop?” or “what did that old report say?”`,
     evidenceIds: [],
   };
 }
@@ -456,12 +519,21 @@ export async function answerQuestion(
   const urgent = emergencyGuard(question);
   const ai = getAIClient();
   const analytics = analyzePet(events, pet.id);
-  const records = retrieveTimelineMemory(events, pet, question, history, analytics.primaryInsight.evidenceIds);
+  const recordMode = shouldUsePetRecords(pet, question, history);
+  const records = recordMode
+    ? retrieveTimelineMemory(events, pet, question, history, analytics.primaryInsight.evidenceIds)
+    : [];
   const memoryMeta = {
     recentTurns: memory.recent.length,
     recalledTurns: memory.recalled.length,
     retrievedRecords: records.length,
   };
+
+  // Greetings, acknowledgements and capability questions should feel like normal conversation and
+  // should not spend an AI request or pretend to cite the pet timeline.
+  if (fallback.scope === "conversation" && isCasualConversation(question, history)) {
+    return { ...fallback, memory: { ...memoryMeta, retrievedRecords: 0 }, mode: "deterministic" };
+  }
 
   if (urgent || !allowAI || !ai) return { ...fallback, memory: memoryMeta, mode: "deterministic" };
 
@@ -484,7 +556,7 @@ PET-SPECIFIC GROUNDING:
 - For broad questions about abnormalities or patterns, summarize all meaningful recorded deviations and relevant context.
 - Be conversational. Follow up naturally on the user's wording instead of restarting with a canned introduction every turn.
 
-Return JSON only: {"scope":"pet-records"|"general","answer":"...","evidenceIds":["..."]}. Evidence IDs must be copied only from supplied records.`,
+Return JSON only: {"scope":"pet-records"|"general"|"conversation","answer":"...","evidenceIds":["..."]}. Use "conversation" for ordinary social/casual chat that does not make a health claim. Evidence IDs must be copied only from supplied records.`,
       input: JSON.stringify({
         pet,
         question,
@@ -498,7 +570,7 @@ Return JSON only: {"scope":"pet-records"|"general","answer":"...","evidenceIds":
     });
     const result = jsonSafe<ChatAnswer>(response.output_text, fallback);
     return {
-      scope: result.scope === "general" ? "general" : "pet-records",
+      scope: result.scope === "general" ? "general" : result.scope === "conversation" ? "conversation" : "pet-records",
       answer: sanitizeMedicalLanguage(result.answer || fallback.answer),
       evidenceIds: (result.evidenceIds ?? []).filter((id) => records.some((event) => event.id === id)),
       memory: memoryMeta,
