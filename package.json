@@ -11,13 +11,13 @@
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
-    "next": "^15.5.21",
-    "next-auth": "5.0.0-beta.32",
+    "next": "15.5.21",
     "openai": "^5.19.1",
     "pdf-parse": "^1.1.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "next-auth": "5.0.0-beta.32"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
@@ -26,7 +26,7 @@
     "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.17.0",
-    "eslint-config-next": "15.5.2",
+    "eslint-config-next": "15.5.21",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2"

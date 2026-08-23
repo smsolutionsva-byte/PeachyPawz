@@ -9,13 +9,21 @@ export default function LoginScreen({ signInAction, configured }: Props) {
       <section className="auth-visual" aria-hidden="true">
         <div className="auth-glow auth-glow-one" />
         <div className="auth-glow auth-glow-two" />
+        <div className="auth-grid" />
+        <div className="auth-orbit auth-orbit-one" />
+        <div className="auth-orbit auth-orbit-two" />
+        <div className="auth-paw-trail">
+          <span>🐾</span><span>🐾</span><span>🐾</span><span>🐾</span>
+        </div>
         <div className="auth-story-card card-one"><span>⚖️</span><div><small>Weight</small><strong>Understand change over time</strong></div></div>
         <div className="auth-story-card card-two"><span>🏃</span><div><small>Activity</small><strong>Compared with their normal</strong></div></div>
         <div className="auth-story-card card-three"><span>🩺</span><div><small>Evidence</small><strong>Every insight stays traceable</strong></div></div>
-        <div className="auth-paw">🐾</div>
+        <div className="auth-paw"><span>🐾</span><i /></div>
+        <div className="auth-visual-caption"><span>Health intelligence</span><strong>From scattered records to one clear story.</strong></div>
       </section>
 
       <section className="auth-panel">
+        <div className="auth-mobile-ambient" aria-hidden="true"><i /><i /><span>🐾</span></div>
         <div className="auth-brand"><span className="brand-mark">P</span><strong>PeachyPawz</strong></div>
         <div className="auth-copy">
           <span className="auth-kicker">Pet health, finally understandable</span>

@@ -269,9 +269,14 @@ function Onboarding({ user, aiAvailable, onComplete }: { user: AuthUser; aiAvail
 
   return (
     <main className="onboarding-page">
+      <div className="onboarding-ambient" aria-hidden="true">
+        <i className="ambient-orb orb-one" /><i className="ambient-orb orb-two" /><i className="ambient-orb orb-three" />
+        <span className="ambient-paw paw-one">🐾</span><span className="ambient-paw paw-two">🐾</span><span className="ambient-paw paw-three">🐾</span>
+      </div>
       <header className="onboarding-top"><BrandMark /><div className="onboarding-user"><span>{user.image ? <img src={user.image} alt="" /> : (user.name?.[0] || "U")}</span><small>{user.email || user.name}</small></div></header>
       <section className="onboarding-card">
-        <div className="step-row"><span className={step >= 1 ? "active" : ""}>1</span><i /><span className={step >= 2 ? "active" : ""}>2</span></div>
+        <div className="step-row"><span className={step >= 1 ? "active" : ""}>1</span><i className={step >= 2 ? "active" : ""} /><span className={step >= 2 ? "active" : ""}>2</span></div>
+        <div key={step} className={`onboarding-step-content step-${step}`}>
         {step === 1 ? <>
           <span className="onboarding-kicker">Welcome to PeachyPawz</span>
           <h1>First, tell us about your pet.</h1>
@@ -299,6 +304,7 @@ function Onboarding({ user, aiAvailable, onComplete }: { user: AuthUser; aiAvail
           <div className="demo-separator"><span>Hackathon evaluator?</span></div>
           <button className="demo-load-button" onClick={() => onComplete(pet, consent, "demo")}><Sparkles size={16} /> Explicitly load the synthetic Max demo story</button>
         </>}
+        </div>
       </section>
       <p className="onboarding-footnote"><ShieldCheck size={14} /> Signed in with Google · Health data in this prototype is stored locally in this browser.</p>
     </main>
@@ -424,19 +430,7 @@ function TimelineRow({ event, detailed = false }: { event: HealthEvent; detailed
   return <article className={`timeline-row ${detailed ? "detailed" : ""}`}><div className={`timeline-icon type-${event.type}`}><EventIcon type={event.type} /></div><div className="timeline-copy"><div className="timeline-title"><strong>{event.title}</strong><span>{shortDate(event.date)}</span></div><p>{event.summary}</p>{detailed && <div className="provenance"><span>{sourceText(event)}</span>{event.confidence && <span>{event.confidence} confidence</span>}<span>{event.reviewStatus === "corrected" ? "Corrected" : "Reviewed"}</span></div>}</div>{detailed && <button className="icon-button"><MoreHorizontal size={17} /></button>}</article>;
 }
 
-function InsightsView({
-  pet,
-  analytics,
-  events,
-  onEvidence,
-  onStory,
-}: {
-  pet: Pet;
-  analytics: AnalyticsResult;
-  events: HealthEvent[];
-  onEvidence: (ids: string[]) => void;
-  onStory: () => void;
-}) {
+function InsightsView({ pet, analytics, events, onEvidence, onStory }: { pet: Pet; analytics: AnalyticsResult; events: HealthEvent[]; onEvidence: (ids: string[]) => void; onStory: () => void }) {
   return <div className="page-stack narrow-page"><div className="page-intro"><div><span className="section-kicker"><Sparkles size={15} /> Explainable intelligence</span><h2>Insights for {pet.name}</h2><p>Ranked by evidence strength, magnitude and persistence — not fear.</p></div></div><section className="insights-feature"><div className="insights-feature-top"><span className="status-pill changes"><span /> Changes detected</span><span className="confidence-pill">{analytics.primaryInsight.confidence}</span></div><h3>{analytics.primaryInsight.title}</h3><p>{analytics.primaryInsight.summary}</p><div className="insight-evidence-summary"><strong>Evidence bundle</strong><span>{analytics.primaryInsight.evidenceIds.length} linked records</span><span>{formatDate(analytics.primaryInsight.timeRange.start)} — {formatDate(analytics.primaryInsight.timeRange.end)}</span></div><button className="button dark" onClick={() => onEvidence(analytics.primaryInsight.evidenceIds)}><FileSearch size={16} /> Inspect evidence</button></section><section className="section-block surface"><div className="section-heading"><div><span className="section-kicker">Baseline deviations</span><h2>What is unusual for {pet.name}?</h2></div></div><div className="baseline-list">{analytics.baselines.map((baseline) => <div key={baseline.metric}><div className={`metric-icon ${baseline.metric}`}><EventIcon type={baseline.metric} /></div><span><strong>{eventLabels[baseline.metric]}</strong><small>{baseline.explanation}</small></span><span className="baseline-range">{baseline.min ?? "—"}–{baseline.max ?? "—"} {baseline.unit}</span></div>)}</div></section><section className="section-block surface story-teaser"><div><span className="section-kicker"><Bot size={15} /> Narrative layer</span><h2>Turn the data into a health story</h2><p>AI receives structured analytics and evidence, then explains the timeline in cautious language.</p></div><button className="button primary" onClick={onStory}>Generate story <Sparkles size={16} /></button></section></div>;
 }
 
