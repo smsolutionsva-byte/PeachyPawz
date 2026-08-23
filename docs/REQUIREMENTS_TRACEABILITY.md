@@ -54,7 +54,10 @@ The challenge asks for a strong mobile-web prototype plus native readiness, not 
 
 | Challenge theme | PeachyPawz evidence | Status |
 |---|---|---|
-| Reduce fragmented-record friction | Optional Ask Peachy browser companion captures user-visible authorized page data | ✅ Prototype bonus |
+| Reduce fragmented-record friction | Optional Ask Peachy desktop browser companion | ✅ Prototype bonus
+| Frictionless mobile capture | Android Peachy Share PWA Target | ✅ Prototype bonus
+| iOS native capture | iOS Share Extension | 🛣️ Roadmap captures user-visible authorized page data | ✅ Prototype bonus |
 | Conversational interaction | Ask questions about a captured page before import | ✅ Prototype bonus |
 | Responsible automation | Captured page is not timeline evidence until review/approval | ✅ Implemented |
 | Connected sources / future native | Extension demonstrates the same human-in-the-loop pattern as future OAuth connectors and native Share Sheet | 🧭 Architecture path |
+

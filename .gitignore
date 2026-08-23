@@ -5,3 +5,7 @@ out
 .env.local
 *.log
 .DS_Store
+
+.env.*.local
+*.tsbuildinfo
+coverage/
