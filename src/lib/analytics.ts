@@ -39,7 +39,7 @@ export function calculateBaseline(events: HealthEvent[], metric: "weight" | "act
     unit,
     explanation:
       values.length >= 4
-        ? `Based on ${values.length} early-period records in this 90-day demo window.`
+        ? `Based on ${values.length} earlier records in this timeline.`
         : `An emerging baseline based on ${values.length} records.`,
   };
 }
@@ -119,14 +119,14 @@ export function analyzePet(events: HealthEvent[], petId: string): AnalyticsResul
     confidence: evidenceIds.length >= 6 ? "High confidence" : evidenceIds.length >= 3 ? "Moderate confidence" : "Limited evidence",
     evidenceIds,
     timeRange: {
-      start: firstEvidence?.date ?? "2026-05-26",
-      end: lastEvidence?.date ?? "2026-08-23",
+      start: firstEvidence?.date ?? petEvents[0]?.date ?? new Date().toISOString().slice(0, 10),
+      end: lastEvidence?.date ?? petEvents.at(-1)?.date ?? new Date().toISOString().slice(0, 10),
     },
     status: "generated",
     responsibleAction: hasMeaningfulPattern
       ? "Continue monitoring the trend and consider discussing persistent changes with a veterinarian."
       : "Keep adding records so PeachyPawz can learn a more reliable baseline.",
-    createdAt: "2026-08-23T08:00:00.000Z",
+    createdAt: new Date().toISOString(),
   };
 
   return {

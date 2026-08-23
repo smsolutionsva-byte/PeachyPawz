@@ -4,7 +4,7 @@ export type Pet = {
   species: "Dog" | "Cat";
   breed: string;
   birthDate: string;
-  sex: "Male" | "Female";
+  sex: "Male" | "Female" | "Unknown";
   color: string;
 };
 

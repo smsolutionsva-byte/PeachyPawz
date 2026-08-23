@@ -2,13 +2,31 @@
 
 **A clearer story for every paw.**
 
-PeachyPawz is an independent mobile-first prototype for the PetOlife AI Code-a-Thon. It turns longitudinal pet-health records into explainable, evidence-backed change summaries instead of behaving like a generic record vault or an ungrounded chatbot.
+PeachyPawz is a mobile-first prototype for the PetOlife AI Code-a-Thon. It turns pet-health records into an explainable longitudinal timeline: what happened, what changed, what patterns exist, what evidence supports them, and what may be worth discussing with a veterinarian.
+
+## First-run experience
+
+A real user no longer lands inside synthetic Max data.
+
+```text
+Google sign-in
+   ↓
+Create pet
+   ↓
+Name + small optional pet details
+   ↓
+Choose whether to allow AI analysis
+   ↓
+Upload a health document / add manually / start empty
+   ↓
+Timeline begins from user-approved data
+```
+
+Synthetic Max/Luna records are still included for the hackathon demo, but they are loaded only when the user explicitly chooses the clearly labelled demo option.
 
 ## Product thesis
 
-Pet health data is fragmented across vet notes, documents, measurements, medications, owner observations, reminders and devices. The core problem is not storage. It is understanding **what changed over time, how unusual that change is for this pet, what else happened nearby in time, and which records support the conclusion**.
-
-PeachyPawz follows this loop:
+Pet-health data is fragmented across vet notes, measurements, medications, documents, owner observations and devices. The core problem is not storage. It is understanding **what changed over time, how unusual it is for this pet, what else happened nearby in time, and which records support the conclusion**.
 
 ```text
 Raw pet data
@@ -17,117 +35,114 @@ Raw pet data
   → deterministic change detection
   → pattern detection
   → evidence bundle
-  → AI explanation
+  → optional AI explanation
   → responsible action
 ```
 
 The timeline is the source of truth. The LLM is not.
 
-## What is implemented
+## Implemented
 
-### Core MVP
-- Max demo profile plus a second pet (Luna) for pet-isolation behavior
-- 90-day synthetic health timeline with a deliberate story
-- Mobile-first home screen and bottom navigation
-- Weight and activity change calculations
-- Emerging/reliable personal-baseline logic
+- Google OAuth with Auth.js
+- Protected AI/document API routes
+- First-run pet onboarding
+- Zero fabricated health records for new users
+- Explicit AI-processing consent in onboarding
+- Empty-state flow with upload/manual entry
+- Optional, clearly labelled synthetic judge demo
+- Mobile-first home/timeline/insights/chat UX
+- Weight and activity trend calculations
+- Personal-baseline logic
 - Multi-metric pattern detection
-- “Why am I seeing this?” evidence drawer
+- Explainable “Why am I seeing this?” evidence drawer
 - Timeline provenance and confidence labels
-- Timeline search and event filters
-- Manual event entry
-- AI Health Story
-- Timeline-aware “Ask about Max” chat
+- Timeline search and filters
+- Manual health-event entry
+- Timeline-grounded Health Story
+- Timeline-aware pet Q&A
 - Vet Visit preparation brief
-- No-key deterministic AI fallback
-- Server-side optional OpenAI adapter
+- Deterministic fallback when AI is disabled/unavailable
 - PDF/TXT document extraction
-- Optional image document extraction when an AI key is present
-- Review-before-save import workflow
-- Wrong-pet confirmation during import
-- Reduced-motion support and touch-friendly interactions
+- Optional AI image extraction when configured + consented
+- Review-before-save document workflow
+- Wrong-pet mismatch warning
+- Reduced-motion and responsive support
 
-### Deliberately not overbuilt
-- No arbitrary health score
-- No diagnosis engine
-- No medication/dosage recommendations
-- No microservices
-- No silent record imports
-- No hidden automatic pet assignment
-- No LLM arithmetic
-- No vector database for simple structured filtering
-- No production auth in the hackathon demo
+## Important prototype persistence note
 
-## Five-minute judge flow
+Google OAuth authenticates the user, while health records are currently stored in **browser localStorage scoped to the signed-in account**. This keeps the code-a-thon demo resilient and avoids making the main flow depend on a database.
 
-1. Open **Max** on Home.
-2. Read **What changed?** — weight, activity and appetite.
-3. Open **Why am I seeing this?** to inspect evidence and deterministic calculations.
-4. Open **Insights** and generate **Max’s Health Story**.
-5. Open **Ask** and ask: `When did activity decline begin?`
-6. Open **Timeline** and inspect the source records.
-7. Import `public/demo/Max_Vet_Report.pdf`.
-8. Review pet assignment, date, clinic and weight before approving.
-9. Confirm the new timeline entries appear.
-10. Open **Prepare for Vet** for the 90-day factual brief.
+That means health data does **not yet sync across devices/browsers**. The production path is MongoDB/object storage with owner + pet authorization. `MONGODB_URI` remains reserved for that next step.
 
-## Tech stack
+## Stack
 
-- Next.js App Router
-- React
+- Next.js 15 App Router
+- React 19
 - TypeScript
-- Tailwind pipeline + custom design system CSS
-- Zod validation
-- Optional OpenAI Responses API adapter on the server
-- `pdf-parse` for text-layer PDFs
-- Browser localStorage for resilient demo-state persistence
+- Tailwind pipeline + custom CSS
+- Auth.js / NextAuth v5 beta
+- Google OAuth
+- Zod
+- OpenAI Responses API (optional, server-side)
+- `pdf-parse`
+- localStorage prototype persistence
 
-### Why localStorage in the demo?
+## Local setup
 
-For a code-a-thon live demo, the highest-risk failure is an external dependency breaking the primary product flow. The UI state therefore persists locally and remains fully functional without a database or AI key. The architecture documents show how the same domain model maps to MongoDB with owner/pet access control in production.
-
-This is a demo reliability tradeoff, not the proposed production persistence strategy.
-
-## Setup
-
-Requirements:
-- Node.js 20+
-- npm
+Requirements: Node.js 20+ and npm.
 
 ```bash
 npm install
 cp .env.example .env.local
+npm exec auth secret
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+`npm exec auth secret` writes a secure `AUTH_SECRET` for Auth.js.
 
-The prototype works without environment variables.
+### Google OAuth
 
-### Optional AI configuration
+Create a Google OAuth **Web application** and add this local callback URI:
+
+```text
+http://localhost:3000/api/auth/callback/google
+```
+
+Put the credentials into `.env.local`:
+
+```env
+AUTH_SECRET=generated_secret
+AUTH_GOOGLE_ID=your_google_client_id
+AUTH_GOOGLE_SECRET=your_google_client_secret
+```
+
+Then restart `npm run dev`.
+
+## Optional AI
+
+Do **not** ask end users to paste an OpenAI key into the browser. The deployment owner configures it server-side:
 
 ```env
 OPENAI_API_KEY=your_server_side_key
 OPENAI_MODEL=gpt-5
 ```
 
-The key is read only inside server routes. Never expose it through `NEXT_PUBLIC_*` variables.
-
-With no key, the app uses deterministic story/chat fallbacks built from the same evidence bundle. With a key, the LLM is used only for bounded narration and timeline Q&A.
+The onboarding then asks the pet parent whether they consent to AI analysis of submitted health records. If they decline, deterministic timeline analytics continue to work and AI calls are not made for story/chat/image extraction.
 
 ## Document import
 
-Supported demo types:
+Supported prototype types:
+
 - PDF
 - TXT
 - JPG
 - PNG
 
-PDF/TXT extraction works without an AI key when the document contains machine-readable text. Image extraction uses the optional server-side AI adapter.
+PDF/TXT uses deterministic extraction where possible. Image extraction uses the optional server-side AI adapter only when the user enabled AI analysis.
 
-Every extraction is a **proposal**. The user must review and approve fields before timeline insertion.
+Every extraction is a proposal. Nothing enters the health timeline until the user reviews and approves it.
 
-A sample PDF is included:
+A synthetic demo report remains available at:
 
 ```text
 public/demo/Max_Vet_Report.pdf
@@ -136,7 +151,7 @@ public/demo/Max_Vet_Report.pdf
 ## AI architecture
 
 ```text
-Health events
+Reviewed health events
    ↓
 Pet-ID filter
    ↓
@@ -146,174 +161,80 @@ Evidence IDs
    ↓
 Bounded evidence bundle
    ↓
-AIService
-   ├─ deterministic fallback
-   └─ optional LLM provider
-   ↓
-Output validation / safety language filter
-   ↓
-UI with provenance
+AI allowed by user?
+   ├─ no  → deterministic explanation
+   └─ yes → server-side AIService
+                 ↓
+        validation + safety filter
+                 ↓
+              UI
 ```
 
-### AI is used for
-- Narrative summarization
-- Natural-language timeline Q&A
-- Optional image-document extraction
+AI is used for explanation, bounded timeline Q&A, and optional image-document extraction. It is not used for percentages, event ordering, baseline math, pet selection, medication decisions, or diagnosis.
 
-### AI is not used for
-- Percentages
-- Event ordering
-- Baseline math
-- Unit comparisons
-- Pet selection
-- Medication decisions
-- Diagnosis
+## Five-minute judge flow
 
-## Data model
+1. Sign in with Google.
+2. Create a pet profile.
+3. Show that the timeline is genuinely empty.
+4. Choose **Upload a health document**.
+5. Review extracted fields before approval.
+6. Add a few manual measurements or explicitly load the synthetic Max demo story.
+7. Open **What changed?**.
+8. Open **Why am I seeing this?** and inspect evidence.
+9. Generate the Health Story.
+10. Ask a timeline question.
+11. Open Prepare for Vet.
 
-The demo uses a normalized `HealthEvent` domain model:
+For the full synthetic storyline, choose **“Explicitly load the synthetic Max demo story”** during onboarding or from the empty state.
 
-```ts
-{
-  id,
-  petId,
-  type,
-  date,
-  title,
-  summary,
-  data,
-  source,
-  sourceLabel,
-  sourceDocumentId,
-  confidence,
-  reviewStatus,
-  createdAt,
-  updatedAt
-}
-```
+## Deploy
 
-Production persistence can split high-value domains into specialized collections (`medications`, `labs`, `documents`, etc.) while retaining an appendable normalized timeline projection for rendering and retrieval.
+The easiest production demo host is Vercel because this is a Next.js app.
 
-## Safety model
-
-- Pet-specific answers require pet-scoped timeline records.
-- General knowledge must not be presented as a fact about the selected pet.
-- Uploaded documents are treated as untrusted data, never as model instructions.
-- Medication start/stop/dose-change language is blocked from generated advice.
-- Emergency-like user wording returns short escalation guidance instead of a diagnostic essay.
-- Claims of causation are avoided; temporal correlation is labelled explicitly.
-- Missing data is not interpreted as normal.
-- AI failure does not block record viewing, manual entry or deterministic analytics.
-
-## Competitive differentiation
-
-Current pet-health products already offer combinations of timelines, AI chat, record scanning, reminders and vet reports. PeachyPawz deliberately focuses the hero experience on:
-
-1. **Personal baseline:** “Is this unusual for this pet?”
-2. **Longitudinal change:** “What changed, and when?”
-3. **Multi-signal context:** “What else happened during the same period?”
-4. **Explainability:** every major insight opens into evidence.
-5. **Responsible language:** correlation is not promoted to causation or diagnosis.
-
-Research notes are in `docs/PRODUCT.md`.
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for GitHub → Vercel → Google OAuth setup.
 
 ## Repository map
 
 ```text
 src/
+  auth.ts                         Auth.js + Google provider
   app/
-    api/ai/                 AI story/chat/vet endpoint
-    api/documents/extract/  document extraction endpoint
-    globals.css             responsive product design system
-    page.tsx
+    api/auth/[...nextauth]/       OAuth route
+    api/ai/                       protected story/chat/vet endpoint
+    api/documents/extract/        protected document extraction
+    page.tsx                      authentication gate
+    globals.css
   components/
-    PeachyApp.tsx           product shell + core screens
+    LoginScreen.tsx               Google sign-in screen
+    PeachyApp.tsx                 onboarding + application UX
     EventIcon.tsx
     Sparkline.tsx
   lib/
-    ai/
-      service.ts            provider abstraction + fallback logic
-      safety.ts             output/emergency safeguards
-    analytics.ts            deterministic health analytics
-    document-extraction.ts  structured extraction schema
-    seed.ts                 90-day synthetic demo story
-    types.ts                domain model
-
-docs/
-  PRODUCT.md
-  ARCHITECTURE.md
-  TEST_PLAN.md
-  NATIVE_ROADMAP.md
-  DEMO_SCRIPT.md
+    ai/service.ts
+    ai/safety.ts
+    analytics.ts
+    document-extraction.ts
+    seed.ts                       optional synthetic judge data
+    types.ts
 ```
 
-## Testing
+## Documentation
 
-A full test matrix is documented in `docs/TEST_PLAN.md`. High-priority automated tests for a production continuation should cover:
-- percent change and baseline logic
-- unit normalization
-- missing-data behavior
-- cross-pet isolation
-- evidence-ID validation
-- stale insight regeneration
-- prompt-injection strings inside extracted documents
-- unsafe medical-language rejection
+- `docs/PRODUCT.md`
+- `docs/ARCHITECTURE.md`
+- `docs/TEST_PLAN.md`
+- `docs/NATIVE_ROADMAP.md`
+- `docs/DEMO_SCRIPT.md`
+- `docs/DEPLOYMENT.md`
 
-## Deployment
+## Safety model
 
-Recommended hackathon deployment: Vercel.
-
-```bash
-npm run build
-```
-
-Set the optional `OPENAI_API_KEY` only in server-side deployment secrets.
-
-Production evolution adds MongoDB/Object Storage and real authentication, but they are intentionally not required for the reliable judge demo.
-
-## Product documentation
-
-- [Product decisions, requirements and risks](docs/PRODUCT.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Testing & safety plan](docs/TEST_PLAN.md)
-- [Android/iOS roadmap](docs/NATIVE_ROADMAP.md)
-- [Five-minute demo script](docs/DEMO_SCRIPT.md)
-
-## Limitations
-
-- Demo state is browser-local, not account-synced.
-- PDF extraction requires a text layer; scanned PDF OCR is a future adapter.
-- Image OCR requires an AI key in this prototype.
-- The heuristic PDF parser is intentionally narrow and exists for demo resilience, not clinical document coverage.
-- Baselines are product analytics, not clinical reference ranges.
-- Synthetic records are not medical advice or real patient data.
-
-## Future roadmap
-
-P1:
-- MongoDB persistence + authentication
-- versioned insight freshness
-- stronger structured document extraction
-- reminder engine
-- richer multi-pet management
-
-P2:
-- Health Data Inbox
-- connected sources with minimum OAuth scopes
-- exportable vet PDF/JSON/CSV
-- structured + semantic lifetime search
-- family roles and sharing
-- PWA offline queue
-
-Native:
-- Android/iOS camera scanning
-- share sheet import
-- local database and background sync
-- push/local reminders
-- biometric app lock
-- voice notes
-- wearable/device ingestion
-
----
-
-PeachyPawz is a code-a-thon prototype, not a veterinary service.
+- Pet-specific answers require pet-scoped records.
+- Imported documents are treated as untrusted data.
+- AI processing requires explicit onboarding consent in the prototype.
+- Medication-change and diagnostic language is restricted.
+- Missing data is never interpreted as “normal.”
+- Temporal correlation is not presented as causation.
+- AI failure does not block manual records, timelines or deterministic analytics.
+- API routes require an authenticated session.

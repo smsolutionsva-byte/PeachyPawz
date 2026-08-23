@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { extractionSchema, heuristicExtract } from "@/lib/document-extraction";
@@ -26,8 +27,11 @@ async function aiExtractImage(buffer: Buffer, mime: string) {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const form = await request.formData();
     const file = form.get("file");
+    const allowAI = form.get("allowAI") === "true";
     if (!(file instanceof File)) return NextResponse.json({ error: "A file is required." }, { status: 400 });
     if (!allowed.has(file.type)) return NextResponse.json({ error: "Unsupported file type. Use PDF, JPG, PNG, or TXT." }, { status: 415 });
     if (file.size > MAX_FILE_BYTES) return NextResponse.json({ error: "File is larger than the 8 MB demo limit." }, { status: 413 });
@@ -35,7 +39,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     let extraction;
     if (file.type === "application/pdf") extraction = heuristicExtract(await extractPdf(buffer));
-    else if (file.type.startsWith("image/")) extraction = (await aiExtractImage(buffer, file.type)) ?? extractionSchema.parse({
+    else if (file.type.startsWith("image/")) extraction = (allowAI ? await aiExtractImage(buffer, file.type) : null) ?? extractionSchema.parse({
       petName: null,
       documentType: "unknown",
       date: null,
@@ -43,9 +47,9 @@ export async function POST(request: Request) {
       weight: null,
       medications: [],
       followUp: null,
-      notes: "Image received. Add OPENAI_API_KEY to enable image extraction in this prototype.",
+      notes: allowAI ? "Image received, but AI image extraction is unavailable on this deployment." : "Image received. AI analysis was not enabled for this import.",
       confidence: "limited",
-      warnings: ["Image OCR is unavailable in deterministic demo mode; review manually."],
+      warnings: [allowAI ? "AI image extraction is unavailable; review manually." : "AI analysis was not enabled; review manually."],
     });
     else extraction = heuristicExtract(buffer.toString("utf8"));
 

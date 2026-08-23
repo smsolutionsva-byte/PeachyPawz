@@ -5,7 +5,10 @@
 ```text
 Next.js mobile web UI
        │
-       ├── Local demo event store
+       ├── Auth.js + Google OAuth
+       │      └── authenticated session gate
+       │
+       ├── Account-scoped prototype workspace
        │      └── browser localStorage
        │
        ├── Deterministic analytics
@@ -188,7 +191,7 @@ Production:
 - pet-sharing ACLs with explicit roles
 - audit log for create/edit/delete/share/import
 
-The code-a-thon prototype intentionally does not pretend its demo session is production auth.
+The prototype now uses real Google OAuth through Auth.js, and sensitive server routes require an authenticated session. Health-record persistence is still browser-local for demo resilience; production persistence must move to MongoDB/object storage with server-side owner/pet authorization.
 
 ## Connected sources
 

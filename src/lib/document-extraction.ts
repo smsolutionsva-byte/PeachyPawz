@@ -19,7 +19,7 @@ export function heuristicExtract(text: string): DocumentExtraction {
   const raw = text.replace(/\r/g, "").trim();
   const clean = raw.replace(/\s+/g, " ").trim();
   const lineValue = (label: string) => raw.match(new RegExp(`^${label}\\s*[:\\-]\\s*(.+)$`, "im"))?.[1]?.trim() ?? null;
-  const pet = lineValue("(?:pet|patient|name)")?.match(/^([A-Za-z]+)/)?.[1] ?? clean.match(/\b(Max|Luna|Milo)\b/i)?.[1] ?? null;
+  const pet = lineValue("(?:pet|patient|name)")?.match(/^([A-Za-z][A-Za-z '-]{0,40})/)?.[1]?.trim() ?? null;
   const dateText = lineValue("(?:date|visit date)");
   const dateMatch = dateText?.match(/(\d{4}-\d{2}-\d{2}|\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/);
   const weightText = lineValue("(?:weight|wt)") ?? clean;

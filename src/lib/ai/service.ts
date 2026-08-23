@@ -14,17 +14,28 @@ const jsonSafe = <T,>(text: string, fallback: T): T => {
 
 function deterministicStory(pet: Pet, events: HealthEvent[]) {
   const analytics = analyzePet(events, pet.id);
+  const petEvents = events.filter((event) => event.petId === pet.id).sort((a, b) => a.date.localeCompare(b.date));
   const weight = analytics.changes.find((item) => item.metric === "weight");
   const activity = analytics.changes.find((item) => item.metric === "activity");
   const appetite = analytics.changes.find((item) => item.metric === "appetite");
+  const diet = petEvents.find((event) => event.type === "diet");
+  const paragraphs: string[] = [];
+
+  if (petEvents.length === 0) {
+    paragraphs.push(`There are no health records in ${pet.name}'s timeline yet.`);
+    paragraphs.push("PeachyPawz will build context only from records you add or approve.");
+  } else {
+    paragraphs.push(`${pet.name}'s available timeline contains ${petEvents.length} reviewed record${petEvents.length === 1 ? "" : "s"}, from ${formatDate(petEvents[0].date)} to ${formatDate(petEvents[petEvents.length - 1].date)}.`);
+    if (weight) paragraphs.push(`Recorded weight changed from ${weight.from} to ${weight.to}${weight.changePercent !== undefined ? ` (${Math.abs(weight.changePercent).toFixed(1)}% ${weight.changePercent >= 0 ? "higher" : "lower"})` : ""}.`);
+    if (activity) paragraphs.push(`Recorded activity changed from ${activity.from} to ${activity.to}${activity.changePercent !== undefined ? ` (${Math.abs(activity.changePercent).toFixed(1)}% ${activity.changePercent >= 0 ? "higher" : "lower"})` : ""}.`);
+    if (diet) paragraphs.push(`A diet event was recorded on ${formatDate(diet.date)}. It occurred within the available timeline; this timing alone does not establish causation.`);
+    if (appetite) paragraphs.push(`Appetite records changed from ${appetite.from} to ${appetite.to}.`);
+    if (paragraphs.length < 4) paragraphs.push("The available history is still limited, so confidence should increase only as more reviewed records are added over time.");
+  }
+
   return {
     title: `${pet.name}'s Health Story`,
-    paragraphs: [
-      `In the earlier part of the available 90-day record, ${pet.name}'s weight and activity stayed close to the emerging personal baseline.`,
-      `A diet change was recorded on June 29. After that point, activity measurements trended downward across several records.`,
-      `By the most recent records, weight moved from ${weight?.from ?? "the earlier value"} to ${weight?.to ?? "the latest value"}, while activity moved from ${activity?.from ?? "the earlier value"} to ${activity?.to ?? "the latest value"}. Appetite was later recorded as ${appetite?.to?.toLowerCase() ?? "changed"}.`,
-      `These events occurred during overlapping periods. The timeline supports a temporal relationship, not a claim that one change caused another.`,
-    ],
+    paragraphs: paragraphs.slice(0, 4),
     action: analytics.primaryInsight.responsibleAction,
     evidenceIds: analytics.primaryInsight.evidenceIds,
   };
@@ -110,9 +121,9 @@ function deterministicAnswer(pet: Pet, events: HealthEvent[], question: string):
 
 const formatDate = (date: string) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${date}T12:00:00`));
 
-export async function generateStory(pet: Pet, events: HealthEvent[]) {
+export async function generateStory(pet: Pet, events: HealthEvent[], allowAI = false) {
   const fallback = deterministicStory(pet, events);
-  if (!process.env.OPENAI_API_KEY) return { ...fallback, mode: "deterministic" as const };
+  if (!allowAI || !process.env.OPENAI_API_KEY) return { ...fallback, mode: "deterministic" as const };
 
   const analytics = analyzePet(events, pet.id);
   const evidence = evidenceFor(events, analytics.primaryInsight.evidenceIds);
@@ -133,10 +144,10 @@ export async function generateStory(pet: Pet, events: HealthEvent[]) {
   };
 }
 
-export async function answerQuestion(pet: Pet, events: HealthEvent[], question: string): Promise<ChatAnswer & { mode: "deterministic" | "llm" }> {
+export async function answerQuestion(pet: Pet, events: HealthEvent[], question: string, allowAI = false): Promise<ChatAnswer & { mode: "deterministic" | "llm" }> {
   const fallback = deterministicAnswer(pet, events, question);
   const urgent = emergencyGuard(question);
-  if (urgent || !process.env.OPENAI_API_KEY) return { ...fallback, mode: "deterministic" };
+  if (urgent || !allowAI || !process.env.OPENAI_API_KEY) return { ...fallback, mode: "deterministic" };
 
   const analytics = analyzePet(events, pet.id);
   const relevant = events.filter((event) => {
@@ -163,22 +174,26 @@ export async function answerQuestion(pet: Pet, events: HealthEvent[], question: 
 export function generateVetBrief(pet: Pet, events: HealthEvent[]) {
   const analytics = analyzePet(events, pet.id);
   const petEvents = events.filter((event) => event.petId === pet.id).sort((a, b) => a.date.localeCompare(b.date));
-  const recent = petEvents.filter((event) => event.date >= "2026-06-01" && event.date <= "2026-08-23");
+  const latestDate = petEvents.at(-1)?.date;
+  const cutoff = latestDate ? new Date(`${latestDate}T12:00:00`) : new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  const cutoffDate = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
+  const recent = petEvents.filter((event) => !latestDate || (event.date >= cutoffDate && event.date <= latestDate));
   const symptoms = recent.filter((event) => event.type === "symptom");
   const meds = recent.filter((event) => event.type === "medication");
   const visits = recent.filter((event) => event.type === "vet");
   return {
-    generatedAt: "2026-08-23T09:00:00+05:30",
-    period: "Last 90 days",
+    generatedAt: new Date().toISOString(),
+    period: latestDate ? `90 days ending ${latestDate}` : "Available records",
     recentChanges: analytics.changes,
     pattern: analytics.primaryInsight.summary,
     symptoms,
     medications: meds,
     visits,
     questions: [
-      "Should the recent weight trend continue to be monitored?",
-      "Could the sustained activity change be relevant to the recent observations?",
-      "What additional measurements would be useful to track over the next few weeks?",
+      "Are any of these recorded changes worth monitoring more closely?",
+      "What additional measurements or symptoms would be useful to track?",
+      "Is there anything in this timeline that should change our follow-up plan?",
     ],
     disclaimer: "This brief summarizes owner-entered and imported records. It does not diagnose a condition or replace veterinary judgment.",
   };
