@@ -1,81 +1,162 @@
 # Five-Minute Demo Script
 
-## 0:00–0:30 — Frame the problem
+## Goal
 
-“Pet parents can have all the records and still not understand what changed. PeachyPawz makes the timeline the source of truth and adds an intelligence layer around change over time.”
+Make the evaluator remember one sentence:
 
-## 0:30–1:15 — Home / What Changed
+> **PeachyPawz does not just store Max's records — it explains what changed and proves why.**
 
-Open Max.
+## 0:00–0:30 — Product framing
+
+Open the live app on a phone-sized viewport.
+
+Say:
+
+> “Pet health data is usually fragmented. My core design decision was to make the timeline the source of truth and use AI only after deterministic analytics build evidence.”
+
+If starting with a fresh account, briefly show that no Max data is invented.
+
+## 0:30–1:15 — Load the intentional demo story
+
+Use the clearly labelled synthetic Max demo.
 
 Point out:
-- Changes detected, not a scary health score
-- Weight: 18.1 → 19.4 kg
-- Activity: 82 → 63 min/day
-- Appetite: Normal → Reduced
 
-Explain that these are deterministic calculations.
+- Max identity is explicit
+- timeline spans stable → diet change → activity decline → weight increase → vet visit
+- the app uses Max's own earlier history as context
 
-## 1:15–1:50 — Why am I seeing this?
+## 1:15–2:00 — “What Changed?”
 
-Open the evidence drawer.
+On Home show:
+
+- weight change
+- activity change
+- appetite change where available
+- personal baseline readiness
+
+Say:
+
+> “These numbers are calculated in TypeScript. The model does not do the arithmetic.”
+
+Tap **Why am I seeing this?**
 
 Show:
-- linked record count
-- exact weight/activity arithmetic
-- timeline records
+
+- linked records
+- source/provenance
 - confidence language
-- explicit “correlation is not causation” note
+- deterministic explanation
 
-Key line: “The model is not asked to invent the reason. It receives a bounded evidence bundle.”
+Say:
 
-## 1:50–2:25 — Health Story
+> “The insight is not a mystery score. The user can drill from conclusion back to evidence.”
 
-Generate Max’s Health Story.
+## 2:00–2:50 — Conversational intelligence
 
-Mention:
-- no API key is required for the demo fallback
-- with a server key, AI improves narrative fluency
-- the core analytics remain the same
-
-## 2:25–3:00 — Timeline chat
+Open Ask.
 
 Ask:
 
-`When did Max's activity decline begin?`
+> **Explain all unusual changes.**
 
-Show the “Based on Max’s records” badge and evidence count.
+Then:
 
-## 3:00–4:05 — Document review
+> **Which happened first?**
 
-Open Timeline → Import.
+Then:
 
-Upload:
+> **What did the vet say about it?**
 
-`public/demo/Max_Vet_Report.pdf`
+Explain:
+
+> “The assistant remembers conversational context, but old assistant text is not allowed to become health evidence. Pet-specific claims are re-grounded in the current timeline.”
+
+Optional small-talk proof:
+
+> “hi”
+
+Show that it does not unnecessarily query/display Max's health data.
+
+## 2:50–3:45 — Document ingestion
+
+Upload `public/demo/Max_Vet_Report.pdf`.
 
 Show:
-- extraction result
-- pet assignment
-- review warnings/confidence
-- editable date/weight
-- explicit Approve & add to timeline
 
-Key line: “AI discovers and proposes. The human decides what becomes the health record.”
+1. extraction is a proposal
+2. pet assignment is explicit
+3. confidence/warnings
+4. review-before-save
+5. approve
 
-## 4:05–4:35 — Vet mode
+If possible, upload the same file again to show duplicate warning.
 
-Open Prepare for Vet.
+Say:
+
+> “AI discovers and proposes; the human verifies; only then does the timeline change.”
+
+## 3:45–4:15 — Data correction
+
+Open a detailed timeline record → correction action.
+
+Change a value and save.
+
+Show **Corrected** provenance and refreshed insight.
+
+Say:
+
+> “AI conclusions are downstream of mutable source data. Correcting evidence changes future interpretation immediately.”
+
+## 4:15–4:40 — Prepare for Vet
+
+Open **Prepare for Vet**.
 
 Show:
+
 - recent changes
-- pattern wording
-- questions to discuss
-- source counts
-- medical disclaimer
+- relevant symptoms/visits/medications
+- suggested factual questions
+- responsible disclaimer
 
-## 4:35–5:00 — Native roadmap
+Say:
+
+> “The goal is to improve the pet parent–vet conversation, not replace clinical judgment.”
+
+## 4:40–5:00 — Native roadmap
 
 Close with:
 
-“Web proves the intelligence model. Native removes capture friction: camera scanning, share sheet, offline timeline, background sync, secure local storage, local reminders and wearables — while health interpretation stays server-controlled and auditable.”
+> “Web proves the intelligence layer. Native Android/iOS removes capture friction through camera scanning, Share Sheet, offline local storage, background sync, local/push reminders and optional biometric locking. The interpretation service stays server-controlled and auditable.”
+
+## If AI provider fails during demo
+
+Do not panic.
+
+Say:
+
+> “The product is useful without an LLM. Timeline, analytics, evidence and Vet Brief are deterministic; the provider failure only reduces the narrative layer.”
+
+That failure mode is an intentional architecture decision.
+
+## Likely evaluator questions
+
+### Why not use an LLM for everything?
+
+Because arithmetic, chronology, units and source selection need deterministic reproducibility. AI is strongest at explanation.
+
+### Why not a health score?
+
+An arbitrary score hides uncertainty and can create false reassurance/alarm. Explainable deviations are more defensible.
+
+### Why localStorage?
+
+For code-a-thon demo resilience only. Production migration is documented as authorized server persistence + private object storage.
+
+### How does this scale to 10 years of records?
+
+Structured metadata filtering first, bounded temporal retrieval, then optional semantic/vector retrieval. Never send a lifetime archive blindly to the model.
+
+### What would you build next?
+
+Production persistence, conflict center, Vet Brief export, Health Data Inbox/connectors, notification engine, then native capture/offline workflows.

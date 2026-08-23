@@ -18,11 +18,13 @@ import {
   Info,
   MessageCircle,
   MoreHorizontal,
+  Pencil,
   Plus,
   Search,
   ShieldCheck,
   Sparkles,
   Stethoscope,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -111,6 +113,8 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
   const [addOpen, setAddOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [petOpen, setPetOpen] = useState(false);
+  const [recordEvent, setRecordEvent] = useState<HealthEvent | null>(null);
 
   useEffect(() => {
     try {
@@ -158,6 +162,20 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
   };
 
   const addEvent = (event: HealthEvent) => setEvents((current) => [event, ...current]);
+  const addPet = (newPet: Pet) => {
+    setUserPets((current) => [...current, newPet]);
+    setSelectedPetId(newPet.id);
+    setPetOpen(false);
+    setView("home");
+  };
+  const updateEvent = (updated: HealthEvent) => {
+    setEvents((current) => current.map((item) => item.id === updated.id ? { ...updated, reviewStatus: "corrected", updatedAt: new Date().toISOString() } : item));
+    setRecordEvent(null);
+  };
+  const deleteEvent = (eventId: string) => {
+    setEvents((current) => current.filter((item) => item.id !== eventId));
+    setRecordEvent(null);
+  };
   const loadDemo = () => {
     setUserPets(demoPets);
     setEvents(demoEvents);
@@ -209,7 +227,7 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
         <header className="mobile-header">
           <BrandMark compact />
           <div className="mobile-header-actions">
-            <PetSwitcher pet={pet} pets={userPets} selectedId={selectedPetId} onSelect={setSelectedPetId} />
+            <PetSwitcher pet={pet} pets={userPets} selectedId={selectedPetId} onSelect={setSelectedPetId} onAddPet={() => setPetOpen(true)} />
             <button className="account-avatar-button mobile-account-button" aria-label="Open account menu" onClick={() => setAccountOpen((value) => !value)}>
               {user.image ? <img src={user.image} alt="" /> : <span>{(user.name || user.email || "U")[0]?.toUpperCase()}</span>}
             </button>
@@ -222,7 +240,7 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
             <h1>{view === "home" ? `${pet.name}'s health story` : navItems.find((item) => item.id === view)?.label}</h1>
           </div>
           <div className="topbar-actions">
-            <PetSwitcher pet={pet} pets={userPets} selectedId={selectedPetId} onSelect={setSelectedPetId} />
+            <PetSwitcher pet={pet} pets={userPets} selectedId={selectedPetId} onSelect={setSelectedPetId} onAddPet={() => setPetOpen(true)} />
             <button className="button secondary desktop-only" onClick={() => setUploadOpen(true)}><Upload size={17} /> Import record</button>
             <button className="button primary desktop-only" onClick={() => setAddOpen(true)}><Plus size={17} /> Add record</button>
             <div className="account-menu-wrap desktop-account">
@@ -240,7 +258,7 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
           {view === "home" && (
             <HomeView pet={pet} events={petEvents} analytics={analytics} onEvidence={setEvidenceIds} onStory={() => setStoryOpen(true)} onVet={() => setVetOpen(true)} onAsk={() => setView("ask")} onTimeline={() => setView("timeline")} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} onDemo={loadDemo} />
           )}
-          {view === "timeline" && <TimelineView pet={pet} events={petEvents} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} />}
+          {view === "timeline" && <TimelineView pet={pet} events={petEvents} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} onEvent={setRecordEvent} />}
           {view === "insights" && <InsightsView pet={pet} analytics={analytics} events={petEvents} onEvidence={setEvidenceIds} onStory={() => setStoryOpen(true)} />}
           {view === "ask" && <AskView pet={pet} events={petEvents} allowAI={aiConsent && aiAvailable} storageKey={`peachypawz:chat:v1:${encodeURIComponent(user.id)}:${pet.id}`} />}
         </section>
@@ -258,7 +276,9 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
       {storyOpen && <StoryModal pet={pet} events={petEvents} allowAI={aiConsent && aiAvailable} onClose={() => setStoryOpen(false)} />}
       {vetOpen && <VetBriefModal pet={pet} events={petEvents} onClose={() => setVetOpen(false)} />}
       {addOpen && <AddEventSheet pet={pet} onAdd={addEvent} onClose={() => setAddOpen(false)} onUpload={() => { setAddOpen(false); setUploadOpen(true); }} />}
-      {uploadOpen && <UploadSheet pet={pet} allowAI={aiConsent && aiAvailable} onAdd={addEvent} onClose={() => setUploadOpen(false)} />}
+      {uploadOpen && <UploadSheet pet={pet} existingEvents={petEvents} allowAI={aiConsent && aiAvailable} onAdd={addEvent} onClose={() => setUploadOpen(false)} />}
+      {petOpen && <AddPetSheet onAdd={addPet} onClose={() => setPetOpen(false)} />}
+      {recordEvent && <RecordEditorSheet event={recordEvent} onSave={updateEvent} onDelete={deleteEvent} onClose={() => setRecordEvent(null)} />}
     </div>
   );
 }
@@ -353,18 +373,19 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function PetSwitcher({ pet, pets, selectedId, onSelect }: { pet: Pet; pets: Pet[]; selectedId: string; onSelect: (id: string) => void }) {
+function PetSwitcher({ pet, pets, selectedId, onSelect, onAddPet }: { pet: Pet; pets: Pet[]; selectedId: string; onSelect: (id: string) => void; onAddPet: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="pet-switcher-wrap">
       <button className="pet-switcher" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
         <span className="pet-avatar" style={{ background: pet.color }}>{pet.name[0]}</span>
         <span><strong>{pet.name}</strong><small>{pet.breed}</small></span>
-        {pets.length > 1 && <ChevronDown size={16} />}
+        <ChevronDown size={16} />
       </button>
-      {open && pets.length > 1 && (
+      {open && (
         <div className="pet-menu">
           {pets.map((item) => <button key={item.id} className={selectedId === item.id ? "selected" : ""} onClick={() => { onSelect(item.id); setOpen(false); }}><span className="pet-avatar small" style={{ background: item.color }}>{item.name[0]}</span><span><strong>{item.name}</strong><small>{item.breed}</small></span>{selectedId === item.id && <Check size={16} />}</button>)}
+          <button className="pet-menu-add" onClick={() => { setOpen(false); onAddPet(); }}><span className="pet-avatar small add">+</span><span><strong>Add another pet</strong><small>Separate timeline & chat memory</small></span></button>
         </div>
       )}
     </div>
@@ -484,16 +505,16 @@ function MetricTrend({ title, series, value, baseline, inverse = false }: any) {
   return <article className="metric-trend"><div className="metric-trend-head"><div><span>{title}</span><strong>{value}</strong></div><small className={inverse ? "down" : "up"}>{delta > 0 ? "+" : ""}{delta.toFixed(1)}% vs baseline</small></div><Sparkline values={series} /><div className="baseline-caption"><span><i /> {baseline?.state === "reliable" ? "Personal baseline" : "Emerging baseline"}</span><strong>{baseline?.min}–{baseline?.max} {baseline?.unit}</strong></div><p>{baseline?.explanation}</p></article>;
 }
 
-function TimelineView({ pet, events, onAdd, onUpload }: { pet: Pet; events: HealthEvent[]; onAdd: () => void; onUpload: () => void }) {
+function TimelineView({ pet, events, onAdd, onUpload, onEvent }: { pet: Pet; events: HealthEvent[]; onAdd: () => void; onUpload: () => void; onEvent: (event: HealthEvent) => void }) {
   const [filter, setFilter] = useState<EventType | "all">("all");
   const [query, setQuery] = useState("");
   const visible = events.filter((event) => filter === "all" || event.type === filter).filter((event) => `${event.title} ${event.summary}`.toLowerCase().includes(query.toLowerCase()));
   const groups = visible.reduce<Record<string, HealthEvent[]>>((acc, event) => { const month = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(new Date(`${event.date}T12:00:00`)); (acc[month] ||= []).push(event); return acc; }, {});
-  return <div className="page-stack narrow-page"><div className="page-intro"><div><span className="section-kicker"><CalendarDays size={15} /> Source of truth</span><h2>{pet.name}'s health timeline</h2><p>Every insight traces back to reviewed records you added or approved.</p></div><div className="page-actions"><button className="button secondary" onClick={onUpload}><Upload size={16} /> Import</button><button className="button primary" onClick={onAdd}><Plus size={16} /> Add record</button></div></div><div className="timeline-toolbar"><label className="search-box"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search records" /></label><div className="filter-row">{["all","weight","activity","diet","symptom","vet","medication"].map((item) => <button className={filter === item ? "active" : ""} onClick={() => setFilter(item as any)} key={item}>{item === "all" ? "All" : eventLabels[item as EventType]}</button>)}</div></div><div className="full-timeline">{Object.entries(groups).map(([month, monthEvents]) => <section key={month}><h3>{month}</h3>{monthEvents.map((event) => <TimelineRow event={event} key={event.id} detailed />)}</section>)}{visible.length === 0 && <div className="zero-state">No matching records yet. Add one manually or import a health document.</div>}</div></div>;
+  return <div className="page-stack narrow-page"><div className="page-intro"><div><span className="section-kicker"><CalendarDays size={15} /> Source of truth</span><h2>{pet.name}'s health timeline</h2><p>Every insight traces back to reviewed records you added or approved.</p></div><div className="page-actions"><button className="button secondary" onClick={onUpload}><Upload size={16} /> Import</button><button className="button primary" onClick={onAdd}><Plus size={16} /> Add record</button></div></div><div className="timeline-toolbar"><label className="search-box"><Search size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search records" /></label><div className="filter-row">{["all","weight","activity","diet","symptom","vet","medication"].map((item) => <button className={filter === item ? "active" : ""} onClick={() => setFilter(item as any)} key={item}>{item === "all" ? "All" : eventLabels[item as EventType]}</button>)}</div></div><div className="full-timeline">{Object.entries(groups).map(([month, monthEvents]) => <section key={month}><h3>{month}</h3>{monthEvents.map((event) => <TimelineRow event={event} key={event.id} detailed onAction={onEvent} />)}</section>)}{visible.length === 0 && <div className="zero-state">No matching records yet. Add one manually or import a health document.</div>}</div></div>;
 }
 
-function TimelineRow({ event, detailed = false }: { event: HealthEvent; detailed?: boolean }) {
-  return <article className={`timeline-row ${detailed ? "detailed" : ""}`}><div className={`timeline-icon type-${event.type}`}><EventIcon type={event.type} /></div><div className="timeline-copy"><div className="timeline-title"><strong>{event.title}</strong><span>{shortDate(event.date)}</span></div><p>{event.summary}</p>{detailed && <div className="provenance"><span>{sourceText(event)}</span>{event.confidence && <span>{event.confidence} confidence</span>}<span>{event.reviewStatus === "corrected" ? "Corrected" : "Reviewed"}</span></div>}</div>{detailed && <button className="icon-button"><MoreHorizontal size={17} /></button>}</article>;
+function TimelineRow({ event, detailed = false, onAction }: { event: HealthEvent; detailed?: boolean; onAction?: (event: HealthEvent) => void }) {
+  return <article className={`timeline-row ${detailed ? "detailed" : ""}`}><div className={`timeline-icon type-${event.type}`}><EventIcon type={event.type} /></div><div className="timeline-copy"><div className="timeline-title"><strong>{event.title}</strong><span>{shortDate(event.date)}</span></div><p>{event.summary}</p>{detailed && <div className="provenance"><span>{sourceText(event)}</span>{event.confidence && <span>{event.confidence} confidence</span>}<span>{event.reviewStatus === "corrected" ? "Corrected" : "Reviewed"}</span></div>}</div>{detailed && onAction && <button className="icon-button" aria-label={`Edit ${event.title}`} onClick={() => onAction(event)}><MoreHorizontal size={17} /></button>}</article>;
 }
 
 function InsightsView({ pet, analytics, events, onEvidence, onStory }: { pet: Pet; analytics: AnalyticsResult; events: HealthEvent[]; onEvidence: (ids: string[]) => void; onStory: () => void }) {
@@ -610,8 +631,9 @@ function StoryModal({ pet, events, allowAI, onClose }: { pet: Pet; events: Healt
 
 function VetBriefModal({ pet, events, onClose }: { pet: Pet; events: HealthEvent[]; onClose: () => void }) {
   const [brief, setBrief] = useState<any>(null);
-  useEffect(() => { fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "vet", pet, events }) }).then((r) => r.json()).then(setBrief); }, [pet, events]);
-  return <div className="overlay centered"><section className="modal vet-modal"><div className="modal-head"><span className="modal-icon mint"><Stethoscope size={20} /></span><div><small>Prepare for Vet</small><h2>{pet.name}'s 90-day brief</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div>{!brief ? <LoadingBlock label="Preparing factual timeline brief…" /> : <div className="vet-brief"><div className="brief-block"><h3>Recent changes</h3>{brief.recentChanges?.map((item: any) => <div className="brief-row" key={item.metric}><span>{item.label}</span><strong>{item.from} → {item.to}</strong>{item.changePercent !== undefined && <em>{item.changePercent > 0 ? "+" : ""}{item.changePercent.toFixed(1)}%</em>}</div>)}</div><div className="brief-block"><h3>Pattern to discuss</h3><p>{brief.pattern}</p></div><div className="brief-block"><h3>Suggested questions</h3><ol>{brief.questions?.map((question: string) => <li key={question}>{question}</li>)}</ol></div><div className="brief-source"><FileText size={17} /><p><strong>Traceable to records</strong>{brief.symptoms?.length || 0} symptom observations · {brief.visits?.length || 0} vet visit · {brief.medications?.length || 0} medication event</p></div><p className="story-disclaimer">{brief.disclaimer}</p></div>}</section></div>;
+  const [windowDays, setWindowDays] = useState<30 | 60 | 90>(90);
+  useEffect(() => { setBrief(null); fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "vet", pet, events, windowDays }) }).then((r) => r.json()).then(setBrief); }, [pet, events, windowDays]);
+  return <div className="overlay centered"><section className="modal vet-modal"><div className="modal-head"><span className="modal-icon mint"><Stethoscope size={20} /></span><div><small>Prepare for Vet</small><h2>{pet.name}'s {windowDays}-day brief</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div><div className="vet-window-switch" aria-label="Vet brief time range">{([30,60,90] as const).map((days) => <button key={days} className={windowDays === days ? "active" : ""} onClick={() => setWindowDays(days)}>{days} days</button>)}</div>{!brief ? <LoadingBlock label="Preparing factual timeline brief…" /> : <div className="vet-brief"><div className="brief-block"><h3>Recent changes</h3>{brief.recentChanges?.map((item: any) => <div className="brief-row" key={item.metric}><span>{item.label}</span><strong>{item.from} → {item.to}</strong>{item.changePercent !== undefined && <em>{item.changePercent > 0 ? "+" : ""}{item.changePercent.toFixed(1)}%</em>}</div>)}</div><div className="brief-block"><h3>Pattern to discuss</h3><p>{brief.pattern}</p></div><div className="brief-block"><h3>Suggested questions</h3><ol>{brief.questions?.map((question: string) => <li key={question}>{question}</li>)}</ol></div><div className="brief-source"><FileText size={17} /><p><strong>Traceable to records</strong>{brief.symptoms?.length || 0} symptom observations · {brief.visits?.length || 0} vet visit · {brief.medications?.length || 0} medication event</p></div><p className="story-disclaimer">{brief.disclaimer}</p></div>}</section></div>;
 }
 
 function AddEventSheet({ pet, onAdd, onClose, onUpload }: { pet: Pet; onAdd: (event: HealthEvent) => void; onClose: () => void; onUpload: () => void }) {
@@ -620,9 +642,9 @@ function AddEventSheet({ pet, onAdd, onClose, onUpload }: { pet: Pet; onAdd: (ev
   return <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Plus size={15} /> Manual entry</span><h2>Add to {pet.name}'s timeline</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div><div className="event-type-grid">{(["weight","activity","appetite","symptom","medication","vet","note"] as EventType[]).map((item) => <button className={type === item ? "active" : ""} onClick={() => setType(item)} key={item}><EventIcon type={item} /><span>{eventLabels[item]}</span></button>)}</div><form className="record-form" onSubmit={submit}><label><span>Date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label><span>{type === "weight" ? "Weight (kg)" : type === "activity" ? "Minutes per day" : eventLabels[type]}</span>{type === "appetite" ? <select value={value} onChange={(e) => setValue(e.target.value)}><option value="">Select</option><option>Normal</option><option>Reduced</option><option>Increased</option></select> : <textarea value={value} onChange={(e) => setValue(e.target.value)} placeholder={type === "weight" ? "e.g. 19.2" : type === "activity" ? "e.g. 68" : "Record what happened…"} />}</label><div className="form-note"><Info size={15} /> Missing data stays missing. PeachyPawz never treats “no record” as “normal.”</div><button className="button primary full" disabled={!value.trim()}>Save reviewed record</button></form><div className="drawer-divider"><span>or</span></div><button className="upload-callout" onClick={onUpload}><Upload size={20} /><span><strong>Import a document</strong><small>PDF, JPG or PNG · review before timeline</small></span><ChevronRight size={17} /></button></aside></div>;
 }
 
-function UploadSheet({ pet, allowAI, onAdd, onClose }: { pet: Pet; allowAI: boolean; onAdd: (event: HealthEvent) => void; onClose: () => void }) {
-  const [file, setFile] = useState<File | null>(null); const [result, setResult] = useState<any>(null); const [loading, setLoading] = useState(false); const [date, setDate] = useState(todayDate()); const [weight, setWeight] = useState("");
-  const extract = async () => { if (!file) return; setLoading(true); const form = new FormData(); form.set("file", file); form.set("allowAI", String(allowAI)); try { const res = await fetch("/api/documents/extract", { method: "POST", body: form }); const data = await res.json(); if (!res.ok) throw new Error(data.error); setResult(data); setDate(data.extraction.date || todayDate()); setWeight(data.extraction.weight?.value?.toString() || ""); } catch (error) { setResult({ error: error instanceof Error ? error.message : "Extraction failed" }); } finally { setLoading(false); } };
+function UploadSheet({ pet, existingEvents, allowAI, onAdd, onClose }: { pet: Pet; existingEvents: HealthEvent[]; allowAI: boolean; onAdd: (event: HealthEvent) => void; onClose: () => void }) {
+  const [file, setFile] = useState<File | null>(null); const [result, setResult] = useState<any>(null); const [loading, setLoading] = useState(false); const [date, setDate] = useState(todayDate()); const [weight, setWeight] = useState(""); const [fileHash, setFileHash] = useState("");
+  const extract = async () => { if (!file) return; setLoading(true); let hash = fileHash; try { const bytes = await file.arrayBuffer(); const digest = await crypto.subtle.digest("SHA-256", bytes); hash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join(""); setFileHash(hash); } catch {} const form = new FormData(); form.set("file", file); form.set("allowAI", String(allowAI)); try { const res = await fetch("/api/documents/extract", { method: "POST", body: form }); const data = await res.json(); if (!res.ok) throw new Error(data.error); setResult(data); setDate(data.extraction.date || todayDate()); setWeight(data.extraction.weight?.value?.toString() || ""); } catch (error) { setResult({ error: error instanceof Error ? error.message : "Extraction failed" }); } finally { setLoading(false); } };
   const approve = () => {
     if (!result?.extraction) return;
     const extraction = result.extraction;
@@ -645,6 +667,7 @@ function UploadSheet({ pet, allowAI, onAdd, onClose }: { pet: Pet; allowAI: bool
         clinic: extraction.clinic || "",
         followUp: extraction.followUp || "",
         medicationText: extraction.medications?.map((m: any) => [m.name, m.dose, m.frequency].filter(Boolean).join(" ")).join("; ") || "",
+        fileHash,
       },
       source: "document_ai",
       sourceLabel: result.filename,
@@ -692,7 +715,57 @@ function UploadSheet({ pet, allowAI, onAdd, onClose }: { pet: Pet; allowAI: bool
   };
   const detectedName = result?.extraction?.petName?.trim();
   const nameMismatch = detectedName && detectedName.toLowerCase() !== pet.name.toLowerCase();
-  return <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Upload size={15} /> Document intelligence</span><h2>Import a health record</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div>{!result?.extraction ? <><label className="drop-zone"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.txt" onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); }} /><span className="drop-icon"><FileText size={23} /></span><strong>{file ? file.name : "Choose a veterinary document"}</strong><p>PDF, JPG, PNG or TXT · max 8 MB</p><small>Nothing enters {pet.name}'s timeline until you review and approve it.</small></label>{result?.error && <div className="error-banner">{result.error}</div>}<button className="button primary full" onClick={extract} disabled={!file || loading}>{loading ? "Extracting…" : "Extract for review"}</button><div className="sample-tip"><FileSearch size={16} /><p>{allowAI ? "AI analysis is enabled for this import with your onboarding consent. PDF text still uses deterministic parsing where possible." : "AI analysis is off. Text-based PDF/TXT extraction still works; image files will require manual review."}</p></div></> : <div className="review-panel"><div className="review-banner"><ShieldCheck size={18} /><span><strong>Proposed fields — review required</strong><small>{result.extraction.confidence} confidence · {result.filename}</small></span></div>{result.extraction.warnings?.map((warning: string) => <div className="warning-line" key={warning}><Info size={15} /> {warning}</div>)}{nameMismatch && <div className="error-banner"><strong>Wrong-pet check:</strong> this document appears to mention “{detectedName}”, but you are importing into {pet.name}. Verify before approving.</div>}<label><span>Assign to pet</span><select value={pet.name} disabled><option>{pet.name}</option></select><small>The destination pet is explicit. PeachyPawz never silently reassigns a health record.</small></label><label><span>Visit date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label><span>Weight</span><div className="input-with-unit"><input value={weight} onChange={(e) => setWeight(e.target.value)} /><span>{result.extraction.weight?.unit || "kg"}</span></div></label><label><span>Clinic</span><input value={result.extraction.clinic || ""} readOnly /></label><label><span>Extracted note</span><textarea value={result.extraction.followUp || result.extraction.notes || ""} readOnly /></label><button className="button primary full" onClick={approve}><Check size={17} /> Approve & add to {pet.name}'s timeline</button><button className="button secondary full" onClick={() => setResult(null)}>Choose a different file</button></div>}</aside></div>;
+  const duplicate = Boolean(fileHash && existingEvents.some((event) => event.type === "document" && event.data.fileHash === fileHash));
+  return <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Upload size={15} /> Document intelligence</span><h2>Import a health record</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div>{!result?.extraction ? <><label className="drop-zone"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.txt" onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); setFileHash(""); }} /><span className="drop-icon"><FileText size={23} /></span><strong>{file ? file.name : "Choose a veterinary document"}</strong><p>PDF, JPG, PNG or TXT · max 8 MB</p><small>Nothing enters {pet.name}'s timeline until you review and approve it.</small></label>{result?.error && <div className="error-banner">{result.error}</div>}<button className="button primary full" onClick={extract} disabled={!file || loading}>{loading ? "Extracting…" : "Extract for review"}</button><div className="sample-tip"><FileSearch size={16} /><p>{allowAI ? "AI analysis is enabled for this import with your onboarding consent. PDF text still uses deterministic parsing where possible." : "AI analysis is off. Text-based PDF/TXT extraction still works; image files will require manual review."}</p></div></> : <div className="review-panel"><div className="review-banner"><ShieldCheck size={18} /><span><strong>Proposed fields — review required</strong><small>{result.extraction.confidence} confidence · {result.filename}</small></span></div>{result.extraction.warnings?.map((warning: string) => <div className="warning-line" key={warning}><Info size={15} /> {warning}</div>)}{nameMismatch && <div className="error-banner"><strong>Wrong-pet check:</strong> this document appears to mention “{detectedName}”, but you are importing into {pet.name}. Verify before approving.</div>}{duplicate && <div className="warning-line"><Info size={15} /> This exact file appears to have already been imported for {pet.name}. Review before creating a duplicate.</div>}<label><span>Assign to pet</span><select value={pet.name} disabled><option>{pet.name}</option></select><small>The destination pet is explicit. PeachyPawz never silently reassigns a health record.</small></label><label><span>Visit date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label><span>Weight</span><div className="input-with-unit"><input value={weight} onChange={(e) => setWeight(e.target.value)} /><span>{result.extraction.weight?.unit || "kg"}</span></div></label><label><span>Clinic</span><input value={result.extraction.clinic || ""} readOnly /></label><label><span>Extracted note</span><textarea value={result.extraction.followUp || result.extraction.notes || ""} readOnly /></label><button className="button primary full" onClick={approve}><Check size={17} /> Approve & add to {pet.name}'s timeline</button><button className="button secondary full" onClick={() => setResult(null)}>Choose a different file</button></div>}</aside></div>;
+}
+
+
+function AddPetSheet({ onAdd, onClose }: { onAdd: (pet: Pet) => void; onClose: () => void }) {
+  const [name, setName] = useState("");
+  const [species, setSpecies] = useState<Pet["species"]>("Dog");
+  const [breed, setBreed] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [sex, setSex] = useState<Pet["sex"]>("Unknown");
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim()) return;
+    onAdd({
+      id: `pet-${Date.now()}`,
+      name: name.trim(),
+      species,
+      breed: breed.trim() || "Breed not added",
+      birthDate,
+      sex,
+      color: species === "Dog" ? "#E9A45D" : "#8F9ED8",
+    });
+  };
+  return <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Plus size={15} /> Multi-pet household</span><h2>Add another pet</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div><p className="drawer-lead">Each pet gets a separate timeline, analytics baseline and conversation memory.</p><div className="species-switch"><button type="button" className={species === "Dog" ? "active" : ""} onClick={() => setSpecies("Dog")}>🐶 Dog</button><button type="button" className={species === "Cat" ? "active" : ""} onClick={() => setSpecies("Cat")}>🐱 Cat</button></div><form className="record-form" onSubmit={submit}><label><span>Pet name *</span><input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Luna" /></label><label><span>Breed <em>optional</em></span><input value={breed} onChange={(event) => setBreed(event.target.value)} placeholder="e.g. Indie" /></label><label><span>Birthday <em>optional</em></span><input type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} /></label><label><span>Sex</span><select value={sex} onChange={(event) => setSex(event.target.value as Pet["sex"])}><option>Unknown</option><option>Male</option><option>Female</option></select></label><button className="button primary full" disabled={!name.trim()}>Create separate pet timeline</button></form></aside></div>;
+}
+
+function RecordEditorSheet({ event, onSave, onDelete, onClose }: { event: HealthEvent; onSave: (event: HealthEvent) => void; onDelete: (eventId: string) => void; onClose: () => void }) {
+  const numeric = event.type === "weight" || event.type === "activity";
+  const [date, setDate] = useState(event.date);
+  const initialValue = numeric ? String(event.data.value ?? "") : event.type === "appetite" ? String(event.data.state ?? "") : String(event.data.note ?? event.summary ?? "");
+  const [value, setValue] = useState(initialValue);
+  const save = (formEvent: FormEvent) => {
+    formEvent.preventDefault();
+    if (!value.trim()) return;
+    const next = { ...event, date };
+    if (numeric) {
+      const number = Number(value);
+      if (!Number.isFinite(number) || number <= 0) return;
+      next.data = { ...event.data, value: number };
+      next.summary = `${number} ${String(event.data.unit || (event.type === "weight" ? "kg" : "min/day"))}`;
+    } else if (event.type === "appetite") {
+      next.data = { ...event.data, state: value };
+      next.summary = value;
+    } else {
+      next.data = { ...event.data, note: value };
+      next.summary = value;
+    }
+    onSave(next);
+  };
+  return <div className="overlay" onMouseDown={(mouseEvent) => { if (mouseEvent.target === mouseEvent.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Pencil size={15} /> Data correction</span><h2>Correct timeline record</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div><div className="review-banner"><ShieldCheck size={18} /><span><strong>{event.title}</strong><small>{sourceText(event)} · corrections recalculate insights immediately</small></span></div><form className="record-form" onSubmit={save}><label><span>Date</span><input type="date" value={date} onChange={(changeEvent) => setDate(changeEvent.target.value)} /></label><label><span>{event.type === "weight" ? `Weight (${String(event.data.unit || "kg")})` : event.type === "activity" ? "Activity (min/day)" : eventLabels[event.type]}</span>{event.type === "appetite" ? <select value={value} onChange={(changeEvent) => setValue(changeEvent.target.value)}><option>Normal</option><option>Reduced</option><option>Increased</option></select> : numeric ? <input inputMode="decimal" value={value} onChange={(changeEvent) => setValue(changeEvent.target.value)} /> : <textarea value={value} onChange={(changeEvent) => setValue(changeEvent.target.value)} />}</label><div className="form-note"><Info size={15} /> PeachyPawz marks corrected records and recomputes baselines, changes and evidence from the updated timeline.</div><button className="button primary full"><Check size={17} /> Save correction</button><button type="button" className="button danger full" onClick={() => { if (window.confirm("Delete this health record? This also removes it from future analytics and evidence.")) onDelete(event.id); }}><Trash2 size={17} /> Delete record</button></form></aside></div>;
 }
 
 function LoadingBlock({ label }: { label: string }) { return <div className="loading-block"><span className="spinner" /><p>{label}</p></div>; }

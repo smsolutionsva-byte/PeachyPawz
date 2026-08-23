@@ -653,3 +653,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .chat-header { align-items: flex-start; }
   .chat-new-button { min-height: 38px; }
 }
+
+/* Submission hardening: multi-pet, correction and destructive-action affordances */
+.pet-menu-add { border-top: 1px solid var(--line) !important; margin-top: 4px; padding-top: 10px !important; }
+.pet-avatar.add { display: grid; place-items: center; background: #f5eee5 !important; color: var(--ink); font-weight: 800; }
+.button.danger { background: #fff6f4; border: 1px solid #efd2cc; color: #9b3b2f; }
+.button.danger:hover { background: #fceae6; }
+@media (max-width: 720px) {
+  .pet-menu { min-width: min(280px, calc(100vw - 32px)); }
+  .button.danger { min-height: 46px; }
+}
+.vet-window-switch { display:flex; gap:6px; margin: 0 0 14px; padding: 4px; width: fit-content; background:#f6f3ee; border:1px solid var(--line); border-radius:999px; }
+.vet-window-switch button { border:0; background:transparent; border-radius:999px; padding:7px 11px; font-size:10px; color:var(--muted); cursor:pointer; }
+.vet-window-switch button.active { background:white; color:var(--ink); box-shadow:0 1px 4px rgba(40,33,25,.08); font-weight:700; }
+@media (max-width:720px){ .vet-window-switch { width:100%; } .vet-window-switch button { flex:1; min-height:40px; font-size:12px; } }

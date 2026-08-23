@@ -1,175 +1,118 @@
-# PeachyPawz Deployment — GitHub + Vercel + Google OAuth
+# Deployment — GitHub + Vercel + Google OAuth
 
-## 1. Install the new authentication dependency
-
-After updating to this version:
+## 1. Install and verify locally
 
 ```bash
 npm install
+npm run typecheck
+npm run build
+npm run dev
 ```
 
-The project uses Auth.js / `next-auth` v5 beta with the Google provider.
-
-## 2. Create local environment variables
-
-Copy the template:
+## 2. Local environment
 
 ```bash
 cp .env.example .env.local
-```
-
-Generate the authentication secret:
-
-```bash
 npm exec auth secret
 ```
 
-Your local environment needs:
+Required:
 
 ```env
 AUTH_SECRET=...
 AUTH_GOOGLE_ID=...
 AUTH_GOOGLE_SECRET=...
-
-# Optional
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5
 ```
 
-Never commit `.env.local`.
+Recommended AI configuration:
 
-## 3. Configure Google OAuth
+```env
+AI_PROVIDER=groq
+GROQ_API_KEY=...
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_VISION_MODEL=qwen/qwen3.6-27b
+```
 
-In Google Auth Platform / Google Cloud Console:
+Never commit `.env.local` and never prefix provider secrets with `NEXT_PUBLIC_`.
 
-1. Configure the OAuth consent screen.
-2. Create an OAuth Client.
-3. Choose **Web application**.
-4. Add the local redirect URI exactly:
+## 3. Google OAuth — local
+
+Create a Google OAuth **Web application**.
+
+Authorized JavaScript origin:
+
+```text
+http://localhost:3000
+```
+
+Authorized redirect URI:
 
 ```text
 http://localhost:3000/api/auth/callback/google
 ```
 
-5. Copy the Client ID into `AUTH_GOOGLE_ID`.
-6. Copy the Client Secret into `AUTH_GOOGLE_SECRET`.
-
-For local development, you can also add this origin:
-
-```text
-http://localhost:3000
-```
-
-The callback URI must match exactly, including protocol, hostname, port and path.
-
-## 4. Test locally
-
-```bash
-npm run dev
-```
-
-Open:
-
-```text
-http://localhost:3000
-```
-
-Expected first-run flow:
-
-```text
-Login → Google → Create pet → AI consent → Upload/manual/empty → app
-```
-
-A new account must not receive synthetic Max records automatically.
-
-## 5. Push to GitHub
-
-If the folder is not already a Git repository:
-
-```bash
-git init
-git add .
-git commit -m "Build PeachyPawz health intelligence timeline"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin main
-```
-
-If it is already connected:
+## 4. Push to GitHub
 
 ```bash
 git add .
-git commit -m "Add Google auth and first-run onboarding"
+git commit -m "Prepare PeachyPawz PetOlife submission"
 git push
 ```
 
-## 6. Import the GitHub repository into Vercel
+## 5. Vercel
 
-1. Sign in to Vercel.
-2. Choose **Add New → Project**.
-3. Import the GitHub repository.
-4. Vercel should detect **Next.js** automatically.
-5. Keep the normal build command: `next build`.
-6. Add Production environment variables:
+Import the GitHub repository. Vercel should detect Next.js automatically.
+
+Add production variables:
 
 ```text
 AUTH_SECRET
 AUTH_GOOGLE_ID
 AUTH_GOOGLE_SECRET
-OPENAI_API_KEY       # optional
-OPENAI_MODEL         # optional
+AI_PROVIDER
+the selected provider key/model variables
+NEXT_PUBLIC_APP_URL=https://peachypawz.vercel.app
 ```
 
-Do not prefix secrets with `NEXT_PUBLIC_`.
+## 6. Google OAuth — production
 
-Deploy the project.
-
-## 7. Add the production Google callback
-
-Suppose Vercel gives you:
+Authorized JavaScript origin:
 
 ```text
 https://peachypawz.vercel.app
 ```
 
-Go back to the Google OAuth client and add this authorized redirect URI:
+Authorized redirect URI:
 
 ```text
 https://peachypawz.vercel.app/api/auth/callback/google
 ```
 
-Also add the production origin if you configured JavaScript origins:
+Google redirect URIs must match exactly.
 
-```text
-https://peachypawz.vercel.app
-```
+## 7. Redeploy
 
-If you later connect a custom domain such as `https://peachypawz.com`, add:
+Environment changes apply to new deployments. Redeploy after changing credentials/provider variables.
 
-```text
-https://peachypawz.com/api/auth/callback/google
-```
+## 8. Production smoke test
 
-## 8. Redeploy after environment changes
+Use an incognito/private window.
 
-If you add or change environment variables after a Vercel deployment, redeploy so the new values are available to the application.
+- Google OAuth completes
+- new account sees onboarding, not Max
+- create pet
+- start empty
+- manual record persists after refresh
+- add second pet and verify isolation
+- synthetic demo can be explicitly loaded
+- evidence drawer works
+- Ask handles both “hi” and pet-specific questions
+- document extraction works
+- correction/delete works
+- Vercel logs show no secrets
 
-## 9. Production-demo checklist
+## 9. Current prototype persistence
 
-Before submission, test in an incognito/private browser:
+Google authentication is production-like; health-record persistence remains browser-local for the code-a-thon.
 
-- Google sign-in opens and returns successfully.
-- Brand-new user sees onboarding, not Max.
-- Pet profile saves.
-- Empty timeline contains zero invented records.
-- Manual record persists after refresh.
-- PDF import requires review before save.
-- AI toggle off prevents optional AI narration/image extraction.
-- AI toggle on works if the server key is present.
-- `/api/ai` returns 401 when called without a session.
-- `/api/documents/extract` returns 401 when called without a session.
-- Mobile layout works at ~375px width.
-
-## Prototype persistence limitation
-
-Authentication is real, but pet health records are currently browser-local for demo reliability. A production implementation should move workspace persistence to MongoDB/object storage and enforce owner/pet authorization server-side.
+Do not present this as production storage. The documented next step is MongoDB/object storage with explicit pet authorization.

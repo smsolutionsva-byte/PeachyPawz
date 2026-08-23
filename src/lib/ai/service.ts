@@ -581,12 +581,12 @@ Return JSON only: {"scope":"pet-records"|"general"|"conversation","answer":"..."
   }
 }
 
-export function generateVetBrief(pet: Pet, events: HealthEvent[]) {
+export function generateVetBrief(pet: Pet, events: HealthEvent[], windowDays: 30 | 60 | 90 = 90) {
   const analytics = analyzePet(events, pet.id);
   const petEvents = events.filter((event) => event.petId === pet.id).sort((a, b) => a.date.localeCompare(b.date));
   const latestDate = petEvents.at(-1)?.date;
   const cutoff = latestDate ? new Date(`${latestDate}T12:00:00`) : new Date();
-  cutoff.setDate(cutoff.getDate() - 90);
+  cutoff.setDate(cutoff.getDate() - windowDays);
   const cutoffDate = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
   const recent = petEvents.filter((event) => !latestDate || (event.date >= cutoffDate && event.date <= latestDate));
   const symptoms = recent.filter((event) => event.type === "symptom");
@@ -594,7 +594,7 @@ export function generateVetBrief(pet: Pet, events: HealthEvent[]) {
   const visits = recent.filter((event) => event.type === "vet");
   return {
     generatedAt: new Date().toISOString(),
-    period: latestDate ? `90 days ending ${latestDate}` : "Available records",
+    period: latestDate ? `${windowDays} days ending ${latestDate}` : "Available records",
     recentChanges: analytics.changes,
     pattern: analytics.primaryInsight.summary,
     symptoms,

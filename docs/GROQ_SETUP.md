@@ -1,14 +1,16 @@
-# Groq setup for PeachyPawz
+# Groq Setup
 
-In Vercel → PeachyPawz → Settings → Environment Variables, add:
+Groq is the recommended low-cost/free-tier-friendly provider for the code-a-thon deployment.
 
-- `AI_PROVIDER` = `groq`
-- `GROQ_API_KEY` = your private Groq API key
-- `GROQ_MODEL` = `llama-3.3-70b-versatile`
-- `GROQ_VISION_MODEL` = `qwen/qwen3.6-27b`
+```env
+AI_PROVIDER=groq
+GROQ_API_KEY=your_private_key
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_VISION_MODEL=qwen/qwen3.6-27b
+```
 
-Apply them to Production (and Preview/Development if desired), save, then redeploy.
+Add these in Vercel → Project → Settings → Environment Variables and redeploy.
 
-Do not create `NEXT_PUBLIC_GROQ_API_KEY`. The key must remain server-side.
+Never use `NEXT_PUBLIC_GROQ_API_KEY`.
 
-PeachyPawz automatically detects Groq if `GROQ_API_KEY` exists even when `AI_PROVIDER` is omitted, but setting `AI_PROVIDER=groq` makes the deployment explicit.
+For Groq, OpenRouter and OpenAI switching, see [`AI_PROVIDER_SETUP.md`](AI_PROVIDER_SETUP.md).

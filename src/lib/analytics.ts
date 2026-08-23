@@ -1,17 +1,21 @@
 import { AnalyticsResult, Baseline, HealthEvent, Insight, MetricChange } from "./types";
+import { displayWeightKg, normalizeWeight } from "./units";
 
 const byDate = (a: HealthEvent, b: HealthEvent) => a.date.localeCompare(b.date);
 const metricEvents = (events: HealthEvent[], type: HealthEvent["type"]) =>
   events.filter((event) => event.type === type).sort(byDate);
 
-const pct = (from: number, to: number) => ((to - from) / from) * 100;
+const pct = (from: number, to: number) => from === 0 ? null : ((to - from) / from) * 100;
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
 export function calculateBaseline(events: HealthEvent[], metric: "weight" | "activity"): Baseline {
   const items = metricEvents(events, metric).filter((event) => typeof event.data.value === "number");
   const baselineItems = items.slice(0, Math.min(metric === "activity" ? 4 : 3, items.length));
-  const values = baselineItems.map((item) => item.data.value as number);
-  const unit = (baselineItems[0]?.data.unit as string) || (metric === "weight" ? "kg" : "min/day");
+  const values = baselineItems.map((item) => {
+    const value = item.data.value as number;
+    return metric === "weight" ? normalizeWeight(value, item.data.unit as string | undefined).value : value;
+  });
+  const unit = metric === "weight" ? "kg" : ((baselineItems[0]?.data.unit as string) || "min/day");
 
   if (values.length < 3) {
     return {
@@ -49,17 +53,20 @@ function changeForNumericMetric(events: HealthEvent[], type: "weight" | "activit
   if (items.length < 2) return null;
   const first = items[0];
   const last = items[items.length - 1];
-  const from = first.data.value as number;
-  const to = last.data.value as number;
-  const unit = (last.data.unit as string) || "";
-  const change = round1(pct(from, to));
+  const firstRaw = first.data.value as number;
+  const lastRaw = last.data.value as number;
+  const from = type === "weight" ? normalizeWeight(firstRaw, first.data.unit as string | undefined).value : firstRaw;
+  const to = type === "weight" ? normalizeWeight(lastRaw, last.data.unit as string | undefined).value : lastRaw;
+  const unit = type === "weight" ? "kg" : ((last.data.unit as string) || "");
+  const rawChange = pct(from, to);
+  const change = rawChange === null ? undefined : round1(rawChange);
   return {
     metric: type,
     label,
-    from: `${round1(from)} ${unit}`,
-    to: `${round1(to)} ${unit}`,
+    from: `${type === "weight" ? displayWeightKg(from) : round1(from)} ${unit}`,
+    to: `${type === "weight" ? displayWeightKg(to) : round1(to)} ${unit}`,
     changePercent: change,
-    direction: change > 1 ? "up" : change < -1 ? "down" : "stable",
+    direction: change === undefined ? (to > from ? "up" : to < from ? "down" : "stable") : change > 1 ? "up" : change < -1 ? "down" : "stable",
     evidenceIds: [first.id, last.id],
   };
 }
@@ -110,11 +117,15 @@ export function analyzePet(events: HealthEvent[], petId: string): AnalyticsResul
   const hasMeaningfulPattern =
     (weight?.changePercent ?? 0) > 5 && (activity?.changePercent ?? 0) < -15;
 
+  const dietContext = diet
+    ? ` A diet change was also recorded on ${diet.date}; this is temporal context only and does not establish causation.`
+    : "";
+
   const primaryInsight: Insight = {
     id: "insight-activity-weight",
     title: hasMeaningfulPattern ? "Activity & weight changed together" : "Recent health pattern",
     summary: hasMeaningfulPattern
-      ? `Weight increased ${Math.abs(weight?.changePercent ?? 0).toFixed(1)}% while activity decreased ${Math.abs(activity?.changePercent ?? 0).toFixed(1)}%. A diet change was recorded shortly before the sustained activity decline.`
+      ? `Weight increased ${Math.abs(weight?.changePercent ?? 0).toFixed(1)}% while activity decreased ${Math.abs(activity?.changePercent ?? 0).toFixed(1)}%.${dietContext}`
       : "There is not enough evidence for a strong multi-metric pattern yet.",
     confidence: evidenceIds.length >= 6 ? "High confidence" : evidenceIds.length >= 3 ? "Moderate confidence" : "Limited evidence",
     evidenceIds,
@@ -143,7 +154,11 @@ export function analyzePet(events: HealthEvent[], petId: string): AnalyticsResul
 export function metricSeries(events: HealthEvent[], petId: string, metric: "weight" | "activity") {
   return metricEvents(events.filter((event) => event.petId === petId), metric)
     .filter((event) => typeof event.data.value === "number")
-    .map((event) => ({ id: event.id, date: event.date, value: event.data.value as number }));
+    .map((event) => {
+      const raw = event.data.value as number;
+      const value = metric === "weight" ? normalizeWeight(raw, event.data.unit as string | undefined).value : raw;
+      return { id: event.id, date: event.date, value: metric === "weight" ? displayWeightKg(value) : value };
+    });
 }
 
 export function evidenceFor(events: HealthEvent[], ids: string[]) {

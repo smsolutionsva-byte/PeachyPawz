@@ -1,172 +1,311 @@
-# PeachyPawz Product Document
+# PeachyPawz Product Plan
 
-## Product definition
+## Product statement
 
-**PeachyPawz turns fragmented pet-health records into an understandable, evidence-backed longitudinal story.**
+**PeachyPawz turns fragmented pet-health records into an understandable, evidence-backed longitudinal health story.**
 
-Target user: a pet parent who has records but cannot quickly answer what changed recently, when the change began, whether it differs from their pet’s usual pattern, and what to bring to a veterinarian.
+It is an independent prototype created for the **PetOlife AI Code-a-Thon**.
 
 ## Problem
 
-Pet-health data is spread across paper/PDF vet records, weight measurements, medication notes, vaccination cards, symptoms, activity trackers and owner memory. A folder can preserve records while still failing to create understanding.
+Pet parents may have health information spread across:
 
-The product therefore optimizes for four questions:
-1. What happened?
-2. What changed?
-3. What patterns exist?
-4. What may be worth timely attention or discussion?
+- vet reports and discharge notes
+- vaccination cards
+- medication instructions
+- lab results
+- PDFs/images
+- weight logs
+- symptom notes
+- diet changes
+- activity data
+- owner memory
 
-## Primary journey
+The failure is not merely storage. The failure is **interpretation across time**.
+
+A user can possess every record and still be unable to answer:
+
+> What changed, when did it change, and what should I bring up at the next vet visit?
+
+## Target user
+
+Primary persona: a responsible pet parent managing ongoing preventive or episodic care who is not a veterinary professional.
+
+They need:
+
+- low-friction record capture
+- confidence that data belongs to the right pet
+- simple interpretation
+- evidence behind interpretations
+- a useful summary before a vet conversation
+
+They do **not** need to operate a clinical EHR.
+
+## Core user pains
+
+1. Records are fragmented.
+2. Longitudinal change is hard to notice manually.
+3. Generic thresholds are less meaningful than “normal for my pet.”
+4. AI answers can be hard to trust without provenance.
+5. Re-uploading/correcting data can create contradictions.
+6. Pet parents need help preparing questions, not a fake diagnosis.
+
+## Product thesis
+
+The timeline is the product's source of truth.
 
 ```text
-Open Max
-→ see Changes Detected
-→ inspect What Changed
-→ open Why am I seeing this?
-→ inspect evidence
-→ read Health Story
-→ ask a timeline question
-→ import/review a new record
-→ generate Vet Brief
+Raw data
+ → reviewed timeline
+ → personal baseline
+ → deterministic change detection
+ → temporal / multi-metric patterns
+ → evidence bundle
+ → optional AI interpretation
+ → responsible action
+```
+
+AI becomes useful when it reduces interpretation effort while remaining traceable.
+
+## Primary user journey
+
+### New user
+
+```text
+Google sign-in
+ → create pet
+ → choose AI consent
+ → upload / manual / empty
+ → reviewed timeline
+```
+
+### Returning user
+
+```text
+Home
+ → What Changed?
+ → Why am I seeing this?
+ → evidence
+ → ask follow-up
+ → Prepare for Vet
+```
+
+### Document journey
+
+```text
+Choose document
+ → extraction proposal
+ → confidence/warnings
+ → wrong-pet/duplicate check
+ → user edits/reviews
+ → approve
+ → structured timeline
+ → analytics update
 ```
 
 ## Information architecture
 
-- Home: high-signal summary and personal baseline
-- Timeline: source of truth, search, filters, provenance
-- Insights: ranked explainable patterns
-- Ask: bounded timeline-grounded conversational layer
-- Prepare for Vet: factual communication artifact
-- Add/Import: controlled data entry with explicit review
+### Home
 
-## MVP priorities
+A fast answer to “what should I notice?”
 
-### P0
-- Pet profile
-- Structured timeline
-- Mobile-first UI
-- Weight/activity tracking
-- Personal baseline
-- Change detection
-- Evidence-backed insight
-- Health Story
-- Responsible AI behavior
-- Documentation and deployability
+- pet identity
+- status / baseline readiness
+- What Changed
+- primary explainable insight
+- personal-baseline trends
+- recent timeline
+- upcoming recorded care
+- quick actions
 
-### P1 included because it materially improves the demo
-- Timeline-aware chat
-- Document upload
-- Review-before-save
-- Vet Visit Mode
-- Basic multi-pet isolation
+### Timeline
 
-### Deferred
-- Real connected sources
-- Family sharing
-- Offline sync queue
-- wearables ingestion
-- full reminder engine
-- export formats
-- production authentication/database
+Source-of-truth view:
 
-## Risks, Edge Cases & Proposed Improvements
+- chronological events
+- search/filter
+- source/provenance
+- confidence/review status
+- correction/deletion
 
-| Problem | Why it matters | Priority | Proposed solution | Tradeoff |
-|---|---|---:|---|---|
-| Too little history | False precision destroys trust | MVP | Baseline states: insufficient, emerging, reliable | Less “magical” early experience |
-| Missing data mistaken for normal | Produces unsafe reassurance | MVP | Preserve missing/unknown as a distinct state | More incomplete-looking UI |
-| Wrong pet assignment | Cross-pet medical contamination | MVP | `petId` filtering everywhere + explicit import assignment | One extra review step |
-| Contradictory same-day values | Silent winner could be wrong | P1 | Conflict object + choose/keep/merge flow | More data-model/UI work |
-| Duplicate document upload | Creates duplicated events and false trends | P1 | file hash + field similarity warning | Hashing/storage metadata |
-| OCR uncertainty | Incorrect facts become longitudinal “truth” | MVP | confidence + review-before-save | Slower import flow |
-| Prompt injection in documents | Document text could attack model controls | MVP | treat extracted text only as quoted/untrusted data; system policy outside data | Requires strict prompting and validation |
-| Unsupported medical claims | High-stakes AI harm | MVP | LLM receives evidence only; block diagnosis/medication language | Responses are more cautious |
-| Correlation presented as causation | Misleads owners | MVP | temporal-language templates and explicit causation disclaimer | Less dramatic insights |
-| Stale insight after correction | Old conclusions survive corrected data | P1 | version insight against event revision hash | Requires recomputation lifecycle |
-| Unit mismatch | 18 kg vs 18 lb can create catastrophic calculations | MVP architecture | canonical internal units + display preference | More normalization logic |
-| Date-only records shifted by timezone | Vaccination/visit date can change incorrectly | MVP architecture | store date-only separately from timestamp | More temporal types |
-| AI provider outage | Demo or product becomes unusable | MVP | deterministic analytics and fallback narratives | Less fluent fallback text |
-| Model cost explosion | Opening dashboard should not call LLM | MVP | event-triggered/cached narratives, deterministic home analytics | Insight may refresh slightly later |
-| Notification fatigue | Users disable the whole system | P2 | aggregate related changes into a single pattern notification | More ranking/grouping logic |
-| Emergency wording | Long chatbot answer delays care | MVP | short emergency escalation guard before LLM | False positives need tuning |
-| Shared device/privacy | Sensitive household data exposure | Future production | session expiry, biometric native lock, account controls | Adds friction |
-| OAuth overreach | Privacy and platform risk | P2 | minimum scopes, explicit source management, revocation | Some sources become less automatic |
-| Malicious/oversized uploads | Security and cost abuse | MVP | MIME allow-list, file-size cap, isolated parsing | Legit large files may require compression |
-| Large lifetime timeline | Slow mobile render/retrieval | P2 | pagination/virtualization + structured date filters | More state complexity |
-| Accessibility through color only | Status inaccessible to some users | MVP | icons + text labels + semantic controls | Slightly denser UI |
-| Animation sensitivity | Motion may cause discomfort | MVP | `prefers-reduced-motion` support | Less flourish for some users |
-| Offline edits conflict | Native sync can overwrite history | Future native | local IDs, revision numbers, conflict queue | Significant sync complexity |
-| Breed-based overreach | Can turn broad risk knowledge into pseudo-diagnosis | MVP policy | breed/life-stage for context only, not diagnosis | Less “personalized” marketing copy |
+### Insights
 
-## Improvements to the original specification
+- strongest current pattern
+- evidence strength
+- baseline deviations
+- link to evidence / story
 
-### 1. Make evidence the interaction model, not a secondary detail
-Instead of a long dashboard, every high-level insight follows progressive disclosure:
+### Ask
 
-`simple change → why → calculation → records → responsible action`
+- natural conversation
+- pet-specific vs general-information distinction
+- context memory
+- fresh timeline/document grounding
 
-### 2. Optimize the hackathon demo for reliability
-A production app should use server persistence and authentication. The prototype keeps demo state locally and makes AI optional so the core story works even when external services fail.
+### Prepare for Vet
 
-### 3. Avoid vector search until it earns its complexity
-Most timeline questions can be solved with pet ID, event type and date filters. Semantic retrieval becomes useful for free-text notes and long documents later. Structured health metadata should remain the first filter.
+- recent changes
+- symptoms
+- medications
+- visits
+- suggested factual questions
 
-### 4. Treat baseline as descriptive, not clinical
-“Max’s normal” is a statistical description of his recorded behavior. It is not a healthy range, diagnosis threshold or veterinary reference interval.
+## AI approach
 
-### 5. Separate proactive “change detected” from urgent care
-Magnitude/persistence can prioritize insights, but urgent symptom escalation should be a separate safety path based on the current user description and/or verified clinical rules.
+AI is not the calculator, database or diagnostic authority.
 
-## Competitive research
+**Deterministic layer:**
 
-Current products already demonstrate that the market values pet timelines, scanning and AI assistance:
+- percentages
+- dates
+- unit normalization
+- baseline calculations
+- event ordering
+- pet filter
+- evidence IDs
 
-- Tamadoggo presents a single pet timeline, AI vet-document scanning, user review before save, and background pattern/letter features.
-  - https://tamadoggo.com/pet-journal-app
-- PawLife markets health diary tracking, AI chat, report scanning, weight trends, reminders and AI-generated veterinary reports.
-  - https://apps.apple.com/in/app/pet-care-tracker-dog-cat/id6760197595
-- PawPrint Health combines document upload, chronological records, record-grounded chat and sharing.
-  - https://pawprinthealth.io/
-- PawsDoc includes smart scan, medical-history summarization, reminders and AI chat.
-  - https://apps.apple.com/in/app/pawsdoc-pet-health-passport/id6759815752
+**AI layer:**
 
-### Competitive conclusion
+- explain structured findings
+- turn events into a concise story
+- answer conversational timeline questions
+- optionally extract text/fields from images
 
-“AI + pet records” is not enough differentiation. PeachyPawz should own **understanding longitudinal change**:
+## Differentiation
 
+PeachyPawz is not differentiated by “having AI.” Mature veterinary/pet platforms already have AI and record histories.
+
+The prototype focuses on:
+
+### 1. Personal longitudinal baseline
+
+“Is this unusual for this pet?” rather than a mystery universal health score.
+
+### 2. Evidence-first insights
+
+Every important interpretation can be drilled into:
+
+```text
+Insight → calculation → evidence records → source timeline
+```
+
+### 3. Safe conversational continuity
+
+Long-running chat can remember prior topics while re-retrieving current records before making pet-specific claims.
+
+### 4. Human-controlled ingestion
+
+AI discovers/proposes; humans verify; only approved data enters the source timeline.
+
+## Safety principles
+
+- no diagnosis engine
+- no medication/dose change recommendations
+- no arbitrary health score
+- no causation from correlation
+- no missing-data-as-normal
+- no silent wrong-pet attachment
+- no silent document extraction into timeline
+- no ungrounded pet-specific answer
+- urgent language receives short vet/emergency guidance
+
+## MVP
+
+### P0 implemented
+
+- authentication
+- pet profile
+- mobile-first navigation
+- structured timeline
+- manual records
+- weight/activity analytics
 - personal baseline
-- clear start of change
-- multi-metric overlap
-- evidence coverage
-- confidence in human terms
-- explicit “why” interaction
+- change detection
+- evidence drawer
+- health story
+- safe fallback behavior
+- README/product/technical documentation
+- deployable Vercel build
 
-## Success metrics
+### High-value P1 implemented
 
-- Time to understand the primary recent change
-- % of surfaced insight claims with evidence IDs
-- document extraction correction rate
-- “Why?” evidence-open rate
-- Health Story usefulness rating
+- document upload + review
+- wrong-pet warning
+- exact duplicate warning
+- timeline-aware conversation + memory
+- Vet Brief
+- multi-pet switching/addition
+- record correction/deletion
+- search/filtering
+- insight freshness through recomputation
+
+## Deliberately deferred
+
+- production MongoDB persistence
+- private object-storage document archive
+- connected vet/email/cloud sources
+- Health Data Inbox
+- full reminder engine + push notifications
+- family/caregiver roles
+- PDF/CSV/JSON export
+- semantic/vector retrieval at lifetime scale
+- wearable integrations
+- offline sync
+
+These are documented rather than simulated because they would add large infrastructure without improving the core code-a-thon proof.
+
+## Product success metrics
+
+### Understanding
+
+- median time to correctly identify the main recent change
+- percentage of users who open evidence after an insight
+
+### Data quality
+
+- extraction correction rate
+- duplicate/wrong-pet prevention rate
+- percentage of insights using reviewed records only
+
+### AI trust/usefulness
+
+- percentage of pet-specific claims with valid evidence IDs
+- useful/not-useful rating on stories/answers
+- fallback rate due to provider errors
+
+### Vet preparation
+
 - Vet Brief generation rate
-- wrong-pet assignment correction rate
-- unsafe-output validation failure rate
-- stale-insight regeneration success rate
+- percentage of briefs opened after a detected change
 
-## Responsible product language
+Avoid vanity metrics such as raw chat-message count.
 
-Preferred:
-- recorded
-- observed
-- appears
-- may
-- occurred during the same period
-- worth monitoring
-- consider discussing with a veterinarian
+## Roadmap
 
-Avoid without verified clinical evidence:
-- caused
-- definitely
-- your pet has
-- guaranteed
-- stop/start/increase/decrease medication
+### Next product iteration
+
+- MongoDB + object storage
+- server-side pet ownership authorization
+- record conflict center
+- reminder objects
+- Vet Brief PDF
+- richer labs/medication schema
+
+### Connected intelligence
+
+- Health Data Inbox
+- explicit OAuth connectors
+- structured + semantic hybrid retrieval
+- insight lifecycle/versioning
+
+### Native Android + iOS
+
+- camera/document scanner
+- share sheet
+- offline local DB
+- sync queue
+- biometric lock
+- local/push notifications
+- wearables
+
+See `NATIVE_ROADMAP.md`.

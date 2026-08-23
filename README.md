@@ -1,95 +1,327 @@
-# PeachyPawz
+# 🐾 PeachyPawz
 
-**A clearer story for every paw.**
+### A clearer story for every paw.
 
-PeachyPawz is a mobile-first prototype for the PetOlife AI Code-a-Thon. It turns pet-health records into an explainable longitudinal timeline: what happened, what changed, what patterns exist, what evidence supports them, and what may be worth discussing with a veterinarian.
+**PeachyPawz** is a mobile-first AI health-intelligence timeline built for the **PetOlife AI Code-a-Thon**.
 
-## First-run experience
+**Live demo:** https://peachypawz.vercel.app  
+**Repository:** https://github.com/smsolutionsva-byte/PeachyPawz
 
-A real user no longer lands inside synthetic Max data.
+> **North star:** Raw Pet Data → Meaningful Health Story → Personalized Insight → Responsible Action
+
+PeachyPawz is intentionally **not** a veterinary diagnosis engine and not a CRUD folder with a chatbot attached. Its core job is to help a pet parent understand longitudinal change:
+
+- **What happened?**
+- **What changed?**
+- **How different is this from my pet's own baseline?**
+- **What other events occurred around the same time?**
+- **Why am I seeing this insight?**
+- **What is a responsible next step?**
+
+---
+
+## 1. The problem
+
+Pet-health information is fragmented across vet reports, PDFs, vaccination cards, measurements, medication notes, symptoms, diet changes and owner observations. A pet parent can have dozens of records and still struggle to answer a simple question:
+
+> **“What actually changed?”**
+
+Most record systems solve **storage**. PeachyPawz focuses on **understanding change over time**.
+
+```text
+Fragmented records
+      ↓
+Reviewed structured timeline
+      ↓
+Personal baseline
+      ↓
+Deterministic change + pattern detection
+      ↓
+Evidence bundle
+      ↓
+Optional AI explanation / conversation
+      ↓
+Responsible action / Vet Brief
+```
+
+The **timeline is the source of truth**. The LLM is a language layer over structured evidence.
+
+---
+
+## 2. First-run experience
+
+A real user never lands inside fabricated Max data.
 
 ```text
 Google sign-in
-   ↓
+      ↓
 Create pet
-   ↓
-Name + small optional pet details
-   ↓
-Choose whether to allow AI analysis
-   ↓
-Upload a health document / add manually / start empty
-   ↓
-Timeline begins from user-approved data
+      ↓
+Name + a few optional details
+      ↓
+Choose whether AI may process submitted records
+      ↓
+Upload document / add manually / start empty
+      ↓
+Health timeline begins
 ```
 
-Synthetic Max/Luna records are still included for the hackathon demo, but they are loaded only when the user explicitly chooses the clearly labelled demo option.
+Synthetic Max/Luna records exist only behind a clearly labelled **hackathon demo** action.
 
-## Product thesis
+---
 
-Pet-health data is fragmented across vet notes, measurements, medications, documents, owner observations and devices. The core problem is not storage. It is understanding **what changed over time, how unusual it is for this pet, what else happened nearby in time, and which records support the conclusion**.
+## 3. What is implemented
+
+### Product / UX
+
+- Google OAuth sign-in with Auth.js
+- Mobile-first responsive experience with bottom navigation
+- First-run pet onboarding
+- Empty timeline with zero fabricated records
+- Multi-pet household switching and **Add another pet**
+- Pet-scoped timelines and chat memory
+- Timeline search and event filters
+- Manual entry for weight, activity, appetite, symptoms, medication, visits and notes
+- Correct / delete reviewed records; analytics update immediately
+- Source/provenance and review-state display
+- “What Changed?” cards
+- Personal baseline view
+- Explainable “Why am I seeing this?” evidence drawer
+- AI Health Story
+- Conversational **Ask about your pet** experience
+- Persistent per-pet conversation memory in the prototype
+- Prepare for Vet brief
+- Upcoming-care visibility from recorded vaccination/follow-up data
+- Reduced-motion support and mobile touch-target hardening
+
+### Analytics / intelligence
+
+- Deterministic percentage change
+- Personal-baseline calculation with insufficient/emerging/reliable states
+- Multi-metric pattern detection
+- Temporal ordering
+- Missing data stays missing
+- Weight unit normalization (`lb` → canonical `kg`) before comparisons
+- Evidence IDs attached to insights
+- Insights regenerate from current reviewed records rather than being permanent conclusions
+
+### Document workflow
+
+- PDF, TXT, JPG and PNG upload
+- Text extraction / heuristic parsing where possible
+- Optional AI vision extraction when configured and consented
+- Review-before-save
+- Wrong-pet warning
+- Exact-file duplicate warning using SHA-256 hash
+- Searchable reviewed document memory retained in the pet timeline
+- Imported data stores provenance, confidence and source-document linkage
+
+### AI / conversation
+
+- Provider abstraction: **Groq**, **OpenRouter**, or **OpenAI**
+- Server-side keys only
+- AI processing requires user consent in the prototype
+- Natural small talk does not retrieve pet health records
+- Pet questions use fresh timeline retrieval
+- Recent chat context + relevant older-turn recall
+- Old conversation may resolve references, but **chat memory is never medical evidence**
+- Pet-specific claims are re-grounded against current timeline records
+- Deterministic fallback if the AI provider fails or is disabled
+- Safety filtering for diagnosis/medication-change language
+- Emergency-language guard before optional LLM calls
+
+---
+
+## 4. The differentiator
+
+Current pet-health software already offers combinations of medical records, reminders, pet-parent apps, AI summaries and chat. PeachyPawz does not position “AI” itself as the innovation.
+
+Its differentiation is:
+
+> **Understanding longitudinal change against this pet's own history — and showing the evidence behind every important interpretation.**
+
+The user can move through progressive disclosure:
 
 ```text
-Raw pet data
-  → normalized timeline
-  → personal baseline
-  → deterministic change detection
-  → pattern detection
-  → evidence bundle
-  → optional AI explanation
-  → responsible action
+Simple insight
+   ↓
+Why?
+   ↓
+Evidence + calculation
+   ↓
+Original timeline records
 ```
 
-The timeline is the source of truth. The LLM is not.
+See [`docs/COMPETITIVE_RESEARCH.md`](docs/COMPETITIVE_RESEARCH.md).
 
-## Implemented
+---
 
-- Google OAuth with Auth.js
-- Protected AI/document API routes
-- First-run pet onboarding
-- Zero fabricated health records for new users
-- Explicit AI-processing consent in onboarding
-- Empty-state flow with upload/manual entry
-- Optional, clearly labelled synthetic judge demo
-- Mobile-first home/timeline/insights/chat UX
-- Weight and activity trend calculations
-- Personal-baseline logic
-- Multi-metric pattern detection
-- Explainable “Why am I seeing this?” evidence drawer
-- Timeline provenance and confidence labels
-- Timeline search and filters
-- Manual health-event entry
-- Timeline-grounded Health Story
-- Timeline-aware pet Q&A
-- Vet Visit preparation brief
-- Deterministic fallback when AI is disabled/unavailable
-- PDF/TXT document extraction
-- Optional AI image extraction when configured + consented
-- Review-before-save document workflow
-- Wrong-pet mismatch warning
-- Reduced-motion and responsive support
+## 5. AI architecture
 
-## Important prototype persistence note
+```mermaid
+flowchart TD
+    A[Reviewed pet events] --> B[Pet ID filter]
+    B --> C[Deterministic analytics]
+    C --> D[Evidence builder]
+    D --> E{AI consent + provider available?}
+    E -- No --> F[Deterministic explanation]
+    E -- Yes --> G[Relevant timeline retrieval]
+    G --> H[Recent chat + recalled older turns]
+    H --> I[AI service]
+    I --> J[Evidence ID + safety validation]
+    J --> K[Health Story / Q&A]
+    F --> K
+```
 
-Google OAuth authenticates the user, while health records are currently stored in **browser localStorage scoped to the signed-in account**. This keeps the code-a-thon demo resilient and avoids making the main flow depend on a database.
+### Deterministic code owns
 
-That means health data does **not yet sync across devices/browsers**. The production path is MongoDB/object storage with owner + pet authorization. `MONGODB_URI` remains reserved for that next step.
+- arithmetic
+- percentages
+- unit normalization
+- event ordering
+- personal-baseline calculations
+- evidence IDs
+- record/pet selection
 
-## Stack
+### AI is used for
 
-- Next.js 15 App Router
-- React 19
-- TypeScript
-- Tailwind pipeline + custom CSS
-- Auth.js / NextAuth v5 beta
-- Google OAuth
-- Zod
-- OpenAI Responses API (optional, server-side)
-- `pdf-parse`
-- localStorage prototype persistence
+- human-readable explanation
+- longitudinal storytelling
+- conversational interaction
+- optional image-document extraction
 
-## Local setup
+This prevents the model from becoming the source of truth.
 
-Requirements: Node.js 20+ and npm.
+More detail: [`docs/AI_APPROACH.md`](docs/AI_APPROACH.md).
+
+---
+
+## 6. Conversational memory without losing evidence
+
+PeachyPawz is designed to feel conversational rather than like a query box.
+
+```text
+Current message
+    +
+recent turns
+    +
+relevant older turns
+    +
+freshly retrieved timeline / document records
+    ↓
+answer
+```
+
+Example:
+
+```text
+User: Explain all unusual changes.
+AI:   Weight rose while activity declined ...
+
+User: Which happened first?
+AI:   [uses conversational reference + timeline ordering]
+
+... many turns later ...
+
+User: What did that old vet report say about follow-up?
+AI:   [recalls the topic, then retrieves the reviewed document record again]
+```
+
+**Important trust rule:** remembered assistant text can help identify what “that” refers to, but it cannot establish a health fact. The current timeline must support the claim.
+
+---
+
+## 7. Responsible medical language
+
+PeachyPawz does not diagnose or prescribe.
+
+It prefers language such as:
+
+- “was observed”
+- “occurred during the same period”
+- “may be worth monitoring”
+- “consider discussing persistent changes with a veterinarian”
+
+It avoids unsupported:
+
+- “caused”
+- “definitely”
+- medication/dosage changes
+- diagnostic claims
+- false reassurance
+
+Potentially urgent user-described situations are intercepted before normal AI narration and surfaced as short guidance to seek prompt veterinary/emergency veterinary attention.
+
+See [`docs/SECURITY_PRIVACY_SAFETY.md`](docs/SECURITY_PRIVACY_SAFETY.md).
+
+---
+
+## 8. Five-minute evaluator demo
+
+1. Open the live product and sign in with Google.
+2. Show that a new pet starts with **zero health records**.
+3. Create a pet or explicitly load the synthetic Max demo.
+4. Open **What Changed?**.
+5. Tap **Why am I seeing this?** and show evidence + deterministic calculation.
+6. Ask: **“Explain all unusual changes.”**
+7. Follow with: **“Which happened first?”** to demonstrate conversational context.
+8. Upload the bundled vet report.
+9. Show wrong-pet / review-before-save behavior and approve the record.
+10. Correct a timeline record and show the insight recalculate.
+11. Generate **Prepare for Vet**.
+12. Close with the native Android/iOS roadmap.
+
+Detailed narration: [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
+
+---
+
+## 9. Demo data
+
+The optional synthetic story contains approximately 90 days of records for **Max**, a Golden Retriever:
+
+```text
+Stable period
+   ↓
+Diet change
+   ↓
+Activity decline
+   ↓
+Weight increase
+   ↓
+Vet visit / monitoring follow-up
+```
+
+The evaluator can see PeachyPawz discover this story from the timeline rather than being handed a mystery health score.
+
+Bundled sample:
+
+```text
+public/demo/Max_Vet_Report.pdf
+public/demo/Max_Vet_Report.txt
+```
+
+---
+
+## 10. Stack
+
+| Layer | MVP choice |
+|---|---|
+| Frontend | Next.js 15, React 19, TypeScript |
+| Styling | Tailwind pipeline + custom mobile-first CSS |
+| Auth | Auth.js / Google OAuth |
+| Analytics | Deterministic TypeScript domain layer |
+| AI | Provider abstraction: Groq / OpenRouter / OpenAI |
+| Validation | Zod |
+| PDF text | `pdf-parse` |
+| Prototype persistence | Browser localStorage, scoped by signed-in user + pet |
+| Deployment | Vercel |
+| Production persistence plan | MongoDB + private object storage |
+
+---
+
+## 11. Local setup
+
+Requirements: Node.js 20+.
 
 ```bash
 npm install
@@ -98,176 +330,199 @@ npm exec auth secret
 npm run dev
 ```
 
-`npm exec auth secret` writes a secure `AUTH_SECRET` for Auth.js.
+Open http://localhost:3000.
 
 ### Google OAuth
 
-Create a Google OAuth **Web application** and add this local callback URI:
+Create a Google OAuth **Web application** and configure:
 
 ```text
+Authorized origin:
+http://localhost:3000
+
+Authorized redirect URI:
 http://localhost:3000/api/auth/callback/google
 ```
 
-Put the credentials into `.env.local`:
+Then set:
 
 ```env
-AUTH_SECRET=generated_secret
-AUTH_GOOGLE_ID=your_google_client_id
-AUTH_GOOGLE_SECRET=your_google_client_secret
+AUTH_SECRET=...
+AUTH_GOOGLE_ID=...
+AUTH_GOOGLE_SECRET=...
 ```
 
-Then restart `npm run dev`.
+---
 
-## Optional AI
+## 12. Free/low-cost AI setup: Groq
 
-Do **not** ask end users to paste an OpenAI key into the browser. The deployment owner configures it server-side:
-
-```env
-OPENAI_API_KEY=your_server_side_key
-OPENAI_MODEL=gpt-5
-```
-
-The onboarding then asks the pet parent whether they consent to AI analysis of submitted health records. If they decline, deterministic timeline analytics continue to work and AI calls are not made for story/chat/image extraction.
-
-## Document import
-
-Supported prototype types:
-
-- PDF
-- TXT
-- JPG
-- PNG
-
-PDF/TXT uses deterministic extraction where possible. Image extraction uses the optional server-side AI adapter only when the user enabled AI analysis.
-
-Every extraction is a proposal. Nothing enters the health timeline until the user reviews and approves it.
-
-A synthetic demo report remains available at:
-
-```text
-public/demo/Max_Vet_Report.pdf
-```
-
-## AI architecture
-
-```text
-Reviewed health events
-   ↓
-Pet-ID filter
-   ↓
-Deterministic analytics
-   ↓
-Evidence IDs
-   ↓
-Bounded evidence bundle
-   ↓
-AI allowed by user?
-   ├─ no  → deterministic explanation
-   └─ yes → server-side AIService
-                 ↓
-        validation + safety filter
-                 ↓
-              UI
-```
-
-AI is used for explanation, bounded timeline Q&A, and optional image-document extraction. It is not used for percentages, event ordering, baseline math, pet selection, medication decisions, or diagnosis.
-
-## Five-minute judge flow
-
-1. Sign in with Google.
-2. Create a pet profile.
-3. Show that the timeline is genuinely empty.
-4. Choose **Upload a health document**.
-5. Review extracted fields before approval.
-6. Add a few manual measurements or explicitly load the synthetic Max demo story.
-7. Open **What changed?**.
-8. Open **Why am I seeing this?** and inspect evidence.
-9. Generate the Health Story.
-10. Ask a timeline question.
-11. Open Prepare for Vet.
-
-For the full synthetic storyline, choose **“Explicitly load the synthetic Max demo story”** during onboarding or from the empty state.
-
-## Deploy
-
-The easiest production demo host is Vercel because this is a Next.js app.
-
-See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for GitHub → Vercel → Google OAuth setup.
-
-## Repository map
-
-```text
-src/
-  auth.ts                         Auth.js + Google provider
-  app/
-    api/auth/[...nextauth]/       OAuth route
-    api/ai/                       protected story/chat/vet endpoint
-    api/documents/extract/        protected document extraction
-    page.tsx                      authentication gate
-    globals.css
-  components/
-    LoginScreen.tsx               Google sign-in screen
-    PeachyApp.tsx                 onboarding + application UX
-    EventIcon.tsx
-    Sparkline.tsx
-  lib/
-    ai/service.ts
-    ai/safety.ts
-    analytics.ts
-    document-extraction.ts
-    seed.ts                       optional synthetic judge data
-    types.ts
-```
-
-## Documentation
-
-- `docs/PRODUCT.md`
-- `docs/ARCHITECTURE.md`
-- `docs/TEST_PLAN.md`
-- `docs/NATIVE_ROADMAP.md`
-- `docs/DEMO_SCRIPT.md`
-- `docs/DEPLOYMENT.md`
-
-## Safety model
-
-- Pet-specific answers require pet-scoped records.
-- Imported documents are treated as untrusted data.
-- AI processing requires explicit onboarding consent in the prototype.
-- Medication-change and diagnostic language is restricted.
-- Missing data is never interpreted as “normal.”
-- Temporal correlation is not presented as causation.
-- AI failure does not block manual records, timelines or deterministic analytics.
-- API routes require an authenticated session.
-
-## Groq AI setup (recommended for the hackathon)
-
-PeachyPawz is provider-aware. Deterministic timelines, trends, baselines, evidence, and vet prep work without an LLM. Groq is used only for optional narrative/chat and image-document extraction.
-
-Add these server-side environment variables locally in `.env.local` and in Vercel Project → Settings → Environment Variables:
+Groq is the recommended code-a-thon configuration.
 
 ```env
 AI_PROVIDER=groq
-GROQ_API_KEY=your_groq_key
+GROQ_API_KEY=your_server_side_key
 GROQ_MODEL=llama-3.3-70b-versatile
 GROQ_VISION_MODEL=qwen/qwen3.6-27b
 ```
 
-Never expose `GROQ_API_KEY` in browser code or prefix it with `NEXT_PUBLIC_`.
+Never prefix a provider key with `NEXT_PUBLIC_`.
 
-The app uses Groq through its OpenAI-compatible API endpoint, so the existing `openai` npm client remains the transport library. If Groq is temporarily unavailable, health story/chat fall back to deterministic evidence-grounded responses and image imports remain reviewable manually.
+Alternative providers:
 
-To switch back to OpenAI later:
+```env
+AI_PROVIDER=openrouter
+OPENROUTER_API_KEY=...
+OPENROUTER_MODEL=openrouter/free
+```
+
+or
 
 ```env
 AI_PROVIDER=openai
-OPENAI_API_KEY=your_key
+OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-5
 ```
 
-## Conversational memory
+If the provider is absent, disabled, rate-limited or unavailable, the core timeline and deterministic analytics still function.
 
-The Ask experience is stateful per signed-in user + pet in the prototype. PeachyPawz stores up to 120 chat turns locally, sends recent turns for natural follow-ups, retrieves older relevant turns by topic, and re-retrieves health records on every question. Conversation text is used only for continuity; it is never treated as medical evidence. Pet-specific claims must still be supported by current reviewed timeline records.
+See [`docs/AI_PROVIDER_SETUP.md`](docs/AI_PROVIDER_SETUP.md).
 
-Approved PDF/TXT/image imports now also create a searchable `document` timeline event containing bounded extracted text (up to 8,000 characters) plus provenance. This allows a user to return many turns later and ask about an older report without requiring the entire document to remain in the model context.
+---
 
-For production, move chat history and document text from browser storage to encrypted server-side persistence (MongoDB/object storage), then replace lexical retrieval with hybrid metadata + semantic retrieval.
+## 13. Deploy to Vercel
+
+The production demo uses Vercel.
+
+Set these environment variables in the Vercel project:
+
+```text
+AUTH_SECRET
+AUTH_GOOGLE_ID
+AUTH_GOOGLE_SECRET
+AI_PROVIDER
+GROQ_API_KEY        # if using Groq
+GROQ_MODEL          # optional override
+GROQ_VISION_MODEL   # optional override
+```
+
+Then add the exact production Google OAuth callback:
+
+```text
+https://peachypawz.vercel.app/api/auth/callback/google
+```
+
+Full guide: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+---
+
+## 14. Prototype limitation: persistence
+
+Authentication is real, but health data in this hackathon build is stored in **browser localStorage scoped to the signed-in account**.
+
+Why this MVP choice:
+
+- removes a database dependency from the evaluator path
+- keeps the demo resilient
+- makes the source-of-truth behavior easy to inspect
+
+What it does **not** provide:
+
+- cross-device sync
+- server-side record durability
+- true family sharing
+- production audit retention
+
+Production migration:
+
+```text
+Auth session
+  ↓
+owner/pet authorization
+  ↓
+MongoDB health-event store
+  +
+private object storage for documents
+  +
+queue for extraction / insight regeneration
+```
+
+The repository does not pretend localStorage is production healthcare infrastructure.
+
+---
+
+## 15. Repository map
+
+```text
+src/
+  auth.ts
+  app/
+    api/auth/[...nextauth]/
+    api/ai/
+    api/documents/extract/
+  components/
+    LoginScreen.tsx
+    PeachyApp.tsx
+    EventIcon.tsx
+    Sparkline.tsx
+  lib/
+    ai/
+      provider.ts
+      service.ts
+      safety.ts
+    analytics.ts
+    document-extraction.ts
+    units.ts
+    seed.ts
+    types.ts
+
+docs/
+  AI_APPROACH.md
+  ARCHITECTURE.md
+  COMPETITIVE_RESEARCH.md
+  DATA_MODEL.md
+  DEMO_SCRIPT.md
+  DEPLOYMENT.md
+  NATIVE_ROADMAP.md
+  PRODUCT.md
+  REQUIREMENTS_TRACEABILITY.md
+  RISKS_EDGE_CASES.md
+  SECURITY_PRIVACY_SAFETY.md
+  SUBMISSION_CHECKLIST.md
+  TEST_PLAN.md
+```
+
+---
+
+## 16. Documentation index
+
+- **Product plan:** [`docs/PRODUCT.md`](docs/PRODUCT.md)
+- **Architecture:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- **AI approach:** [`docs/AI_APPROACH.md`](docs/AI_APPROACH.md)
+- **Data model:** [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md)
+- **Design decisions:** [`docs/DESIGN_DECISIONS.md`](docs/DESIGN_DECISIONS.md)
+- **Risks & edge cases:** [`docs/RISKS_EDGE_CASES.md`](docs/RISKS_EDGE_CASES.md)
+- **Security/privacy/medical safety:** [`docs/SECURITY_PRIVACY_SAFETY.md`](docs/SECURITY_PRIVACY_SAFETY.md)
+- **Competitive context:** [`docs/COMPETITIVE_RESEARCH.md`](docs/COMPETITIVE_RESEARCH.md)
+- **Testing:** [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md)
+- **Native Android/iOS roadmap:** [`docs/NATIVE_ROADMAP.md`](docs/NATIVE_ROADMAP.md)
+- **Requirements traceability:** [`docs/REQUIREMENTS_TRACEABILITY.md`](docs/REQUIREMENTS_TRACEABILITY.md)
+- **Deployment:** [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+- **Five-minute demo:** [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+- **Submission checklist:** [`docs/SUBMISSION_CHECKLIST.md`](docs/SUBMISSION_CHECKLIST.md)
+- **Interview cheat sheet:** [`docs/INTERVIEW_CHEATSHEET.md`](docs/INTERVIEW_CHEATSHEET.md)
+
+---
+
+## 17. Scope discipline
+
+PeachyPawz deliberately does **not** implement a veterinary EHR, marketplace, social network, diagnosis engine or arbitrary health score.
+
+The MVP spends complexity only where it advances the challenge transformation:
+
+> **Raw data → longitudinal understanding → evidence-backed insight → responsible action.**
+
+---
+
+## Disclaimer
+
+PeachyPawz is a code-a-thon prototype for pet-health organization and decision support. It is **not a veterinary medical device and not a substitute for a veterinarian**.

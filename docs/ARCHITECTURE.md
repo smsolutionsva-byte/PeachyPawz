@@ -1,236 +1,204 @@
-# Architecture
+# Technical Architecture
 
-## Prototype architecture
+## MVP topology
+
+```mermaid
+flowchart TB
+    U[Pet parent] --> W[Next.js mobile-first web]
+    W --> A[Auth.js / Google OAuth]
+    W --> L[Browser workspace storage]
+    W --> API[Authenticated Next.js API routes]
+
+    API --> DOC[Document extraction]
+    API --> AIS[AI service abstraction]
+
+    AIS --> G[Groq]
+    AIS --> OR[OpenRouter]
+    AIS --> O[OpenAI]
+
+    L --> TL[Pet-scoped timeline]
+    TL --> AN[Deterministic analytics]
+    AN --> EV[Evidence builder]
+    EV --> W
+    EV --> AIS
+```
+
+## Why one Next.js application
+
+For this MVP, a modular monolith is preferable to microservices:
+
+- one deployable unit
+- simple authentication boundary
+- fewer network failure modes
+- domain logic remains easy to inspect
+- sufficient for code-a-thon scale
+
+The architecture separates modules by responsibility without pretending they need independent infrastructure yet.
+
+## Client domain flow
 
 ```text
-Next.js mobile web UI
-       │
-       ├── Auth.js + Google OAuth
-       │      └── authenticated session gate
-       │
-       ├── Account-scoped prototype workspace
-       │      └── browser localStorage
-       │
-       ├── Deterministic analytics
-       │      ├── baseline
-       │      ├── percent change
-       │      ├── trend / overlap
-       │      └── evidence IDs
-       │
-       └── Server routes
-              ├── /api/ai
-              │     ├── deterministic fallback
-              │     └── optional LLM provider
-              │
-              └── /api/documents/extract
-                    ├── MIME/size validation
-                    ├── PDF text extraction
-                    ├── heuristic structured parser
-                    └── optional image AI extraction
+reviewed HealthEvent[]
+     ↓ petId filter
+pet timeline
+     ↓
+analyzePet()
+     ↓
+AnalyticsResult
+     ├─ changes
+     ├─ baselines
+     ├─ primary insight
+     └─ evidence IDs
 ```
 
-## Production target
+Home/Insights render deterministic results immediately. AI is requested only for explicit narrative/chat/document actions.
+
+## Authentication
+
+`src/auth.ts` configures Auth.js Google OAuth.
+
+Server endpoints check the authenticated session before AI or extraction work.
+
+Prototype local data is keyed to the signed-in account. Production must not rely on that client key as authorization; the backend must validate owner/membership + pet on every operation.
+
+## Workspace persistence
+
+### Prototype
 
 ```text
-Web / Android / iOS
-        │
-      API/BFF
-        │
- ┌──────┼──────────┬──────────────┐
- │      │          │              │
-Auth   Pets     Documents      Notifications
- │      │          │              │
- │   Health Events │              │
- │      │       OCR/Extraction    │
- │      └──────┬───┘              │
- │             ↓                  │
- │       Timeline Projection      │
- │             ↓                  │
- │        Analytics Engine        │
- │             ↓                  │
- │       Evidence Builder         │
- │             ↓                  │
- │         AI Service             │
- │             ↓                  │
- └──────── MongoDB / Object Storage / Queue
+Google user ID
+  ↓
+localStorage workspace key
+  ├─ pets
+  ├─ events
+  ├─ selected pet
+  └─ AI consent
+
+per user + pet chat key
+  └─ recent conversation turns
 ```
 
-## Database design
+This makes the evaluator path resilient but does not provide cross-device durability.
 
-Recommended collections:
+### Production
 
-- `users`
-- `pets`
-- `health_events`
-- `measurements`
-- `medications`
-- `vaccinations`
-- `symptoms`
-- `vet_visits`
-- `lab_results`
-- `documents`
-- `document_extractions`
-- `insights`
-- `reminders`
-- `ai_reports`
-- `connected_sources`
-- `sync_jobs`
-- `audit_events`
-
-### Key isolation rule
-
-Every health-domain query must include both authenticated `ownerId` access and target `petId`.
-
-Never retrieve broad household records and ask the LLM to separate pets later.
-
-## Event model
-
-Use a stable normalized timeline record plus specialized data where structure matters.
-
-```ts
-type HealthEvent = {
-  id: string
-  ownerId: string
-  petId: string
-  type: EventType
-  eventDate: string       // date-only when appropriate
-  occurredAt?: Date       // precise timestamp only when known
-  data: Record<string, unknown>
-  source: SourceType
-  sourceDocumentId?: string
-  confidence?: Confidence
-  reviewStatus: ReviewStatus
-  revision: number
-  createdBy: string
-  createdAt: Date
-  updatedAt: Date
-}
+```mermaid
+flowchart TD
+    S[Authenticated session] --> P[Pet authorization]
+    P --> DB[(MongoDB / relational domain store)]
+    P --> OS[(Private object storage)]
+    DB --> Q[Job queue]
+    Q --> X[Extraction / analytics / summary jobs]
+    X --> DB
 ```
 
-### Unit strategy
+## Data modules
 
-Measurements should store:
-- original value/unit
-- canonical value/unit
-- display preference
+- `types.ts` — domain contracts
+- `units.ts` — canonical unit normalization
+- `analytics.ts` — deterministic longitudinal analytics
+- `document-extraction.ts` — structured extraction schema + heuristic parsing
+- `ai/provider.ts` — provider abstraction
+- `ai/service.ts` — story/chat/retrieval orchestration
+- `ai/safety.ts` — output/urgent-language guardrails
+- `seed.ts` — explicit synthetic evaluator data only
 
-Example: weight canonicalized to kilograms.
-
-## Insight lifecycle
+## Document pipeline
 
 ```text
-Event mutation
-  → analytics input hash changes
-  → dependent insight marked stale
-  → deterministic analytics recalculated
-  → evidence bundle rebuilt
-  → narrative regenerated if required
-  → prior insight superseded, not silently overwritten
+file
+ ↓
+size/type validation
+ ↓
+SHA-256 exact duplicate fingerprint
+ ↓
+PDF/TXT text extraction or optional vision extraction
+ ↓
+structured proposal (Zod validated)
+ ↓
+wrong-pet / confidence warnings
+ ↓
+user review
+ ↓ approve
+structured event(s) + document-memory event
+ ↓
+timeline analytics recompute
 ```
 
-Suggested insight fields:
-- ID
-- pet ID
-- type
-- created timestamp
-- time range
-- evidence IDs
-- evidence hash
-- confidence label
-- status (`generated`, `dismissed`, `superseded`, `stale`)
-- model/provider/version for AI text
+The source document text cannot issue instructions to the model; it is data inside a bounded extraction context.
 
-## AI service boundary
+## Weight-unit normalization
 
-```ts
-interface AIService {
-  extractDocument(...): Promise<DocumentExtraction>
-  summarizeTimeline(...): Promise<HealthStory>
-  answerTimelineQuestion(...): Promise<GroundedAnswer>
-  generateVetSummary(...): Promise<VetBrief>
-}
-```
-
-Provider-specific code must stay behind this interface.
-
-## Retrieval design
-
-1. Authorize owner/pet.
-2. Parse question intent.
-3. Apply structured filters first: `petId`, event type, date range, source.
-4. Retrieve bounded records.
-5. Optionally semantic-rank free-text notes/documents inside the already authorized subset.
-6. Build evidence bundle with stable event IDs.
-7. Generate text.
-8. Validate output evidence IDs and safety language.
-
-This avoids sending a pet’s complete lifetime archive to a model for every question.
-
-## Document security
-
-Uploads are untrusted.
-
-Required production controls:
-- allow-listed MIME types
-- magic-byte verification
-- upload size/page limits
-- malware scan/sandboxed parsing
-- no executable rendering
-- object storage with private signed URLs
-- OCR/document text inserted only into a data channel
-- explicit user approval before normalized records are committed
-- hash/similarity duplicate checks
-- extraction model/version and confidence stored
-
-## Authentication and authorization
-
-Production:
-- OIDC/auth provider or platform identity
-- short-lived sessions
-- row/document-level owner checks
-- pet-sharing ACLs with explicit roles
-- audit log for create/edit/delete/share/import
-
-The prototype now uses real Google OAuth through Auth.js, and sensitive server routes require an authenticated session. Health-record persistence is still browser-local for demo resilience; production persistence must move to MongoDB/object storage with server-side owner/pet authorization.
-
-## Connected sources
+The timeline can retain source units, but analytics converts weight into canonical kilograms before baseline or percentage comparison.
 
 ```text
-Connect source
-  → explicit OAuth consent
-  → minimum scope
-  → encrypted token storage
-  → discover candidate records
-  → classify/extract
-  → Health Data Inbox
-  → user reviews
-  → timeline commit
+18 kg → 18 kg
+40 lb → 18.14 kg
 ```
 
-Disconnect should revoke local tokens and clearly define whether imported historical records remain.
+This avoids unit-induced false trends.
 
-## Performance / scale
+## Record mutation / insight freshness
 
-- Cursor-paginate timeline records.
-- Precompute common rolling aggregates.
-- Do not LLM-generate on every page open.
-- Recompute only metrics affected by changed event types/time ranges.
-- Cache reports by evidence hash.
-- Background queues for large documents and connected-source sync.
-- Virtualize large timeline lists on mobile.
-
-
-## Conversational memory and retrieval
+Insights are calculated from the current timeline rather than treated as permanent model output.
 
 ```text
-Current question
-   ├─ Recent chat turns (short-term continuity)
-   ├─ Relevant older turns (conversation recall)
-   └─ Pet-scoped timeline/document retrieval (source of truth)
-                     ↓
-             Evidence-grounded AI
-                     ↓
-        Answer + validated evidence IDs
+record correction/deletion
+   ↓
+React state changes
+   ↓
+analyzePet(current events)
+   ↓
+new evidence + new insight
 ```
 
-The conversation layer deliberately separates *memory* from *evidence*. Old user/assistant turns help resolve references such as “that report” or “before that,” but cannot establish a pet-health fact. The system must re-ground pet-specific claims in the selected pet's current reviewed records. In the browser prototype chat history is stored per account/pet in localStorage; production should store it server-side with authorization, retention/deletion controls, encryption, and hybrid retrieval.
+Production should add explicit insight records with data-version hashes and `stale/superseded` lifecycle states.
+
+## Conversational retrieval
+
+The chat input is first routed into:
+
+- conversation
+- general information
+- pet-record question/follow-up
+
+For pet-record questions:
+
+```text
+question
+ + recent conversation
+ + relevant older conversation
+ + relevant current pet events/documents
+ → AI service
+ → evidence validation
+ → answer
+```
+
+Conversation history can clarify “that report” but cannot prove a health claim.
+
+## API surface
+
+### `/api/ai`
+
+Authenticated operations for story/chat where configured.
+
+### `/api/documents/extract`
+
+Authenticated upload/extraction endpoint with bounded inputs.
+
+### `/api/auth/[...nextauth]`
+
+Auth.js OAuth endpoints.
+
+## Scaling path
+
+Do not prematurely split microservices. Introduce infrastructure when workload requires it:
+
+1. database/object storage
+2. queue for extraction and regeneration
+3. notification service
+4. connector/import workers
+5. hybrid retrieval index
+6. analytics observability
+
+Domain APIs can later separate into Pet, Records, Documents, Analytics, AI and Notification services while preserving the same event/evidence contracts.
