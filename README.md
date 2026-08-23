@@ -130,11 +130,18 @@ Synthetic Max/Luna records exist only behind a clearly labelled **hackathon demo
 - Safety filtering for diagnosis/medication-change language
 - Emergency-language guard before optional LLM calls
 
-### Bonus ingestion experiment — Ask Peachy browser companion
+### Bonus ingestion experiments — Ask Peachy + Peachy Share
 
-The repo also contains an optional Manifest V3 extension in [`extension/`](extension/) that demonstrates a low-friction bridge from an authorized webpage into PeachyPawz. It uses temporary `activeTab` access, captures only visible text after an explicit click, and hands the capture to PeachyPawz for **Ask about this page** or **review-before-import**. It is intentionally a bonus path; the core challenge demo does not depend on it.
+The repo contains two optional capture bridges that feed the **same review-first ingestion pipeline**:
 
-See [`docs/BROWSER_EXTENSION.md`](docs/BROWSER_EXTENSION.md).
+- **Desktop:** the Manifest V3 [`extension/`](extension/) uses temporary `activeTab` access to capture visible page text only after an explicit click.
+- **Android mobile:** the installable PWA declares a Web Share Target, allowing selected text, URLs, images and PDFs to be shared into **Peachy Share** from the system Share Sheet.
+
+Both paths stage data first. Nothing becomes a verified pet record until the user reviews and approves it.
+
+See [`docs/BROWSER_EXTENSION.md`](docs/BROWSER_EXTENSION.md) and [`docs/PEACHY_SHARE.md`](docs/PEACHY_SHARE.md).
+
+> iOS PWA Share Target parity is **not claimed**. The native roadmap uses an iOS Share Extension feeding the same review workflow.
 
 ---
 

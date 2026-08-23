@@ -61,6 +61,19 @@ type WebCapture = {
   selectedText?: string;
   capturedAt: string;
   expiresAt?: number;
+  origin?: "extension" | "mobile-share";
+};
+
+type PeachyShareFileMeta = { key: string; name: string; type: string; size: number };
+type PeachySharePayload = {
+  id: string;
+  title: string;
+  text: string;
+  url: string;
+  capturedAt: string;
+  files: PeachyShareFileMeta[];
+  source?: string;
+  loadedFiles: File[];
 };
 
 const eventLabels: Record<EventType, string> = {
@@ -128,6 +141,8 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
   const [petOpen, setPetOpen] = useState(false);
   const [recordEvent, setRecordEvent] = useState<HealthEvent | null>(null);
   const [webCapture, setWebCapture] = useState<WebCapture | null>(null);
+  const [mobileShare, setMobileShare] = useState<PeachySharePayload | null>(null);
+  const [sharedUploadFile, setSharedUploadFile] = useState<File | null>(null);
 
   useEffect(() => {
     try {
@@ -176,6 +191,57 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
     return () => window.removeEventListener("message", receiveExtensionCapture);
   }, [webCaptureKey]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPeachyShare = async () => {
+      if (!("caches" in window)) return;
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const cache = await caches.open("peachypawz-share-v1");
+        let id = params.get("peachyShare") || "";
+        if (!id) id = (await (await cache.match("/__peachy_share__/latest"))?.text()) || "";
+
+        if (id) {
+          const metaResponse = await cache.match(`/__peachy_share__/${encodeURIComponent(id)}/meta`);
+          if (metaResponse) {
+            const meta = await metaResponse.json() as Omit<PeachySharePayload, "loadedFiles">;
+            const loadedFiles: File[] = [];
+            for (const item of meta.files || []) {
+              const response = await cache.match(item.key);
+              if (!response) continue;
+              const blob = await response.blob();
+              loadedFiles.push(new File([blob], item.name, { type: item.type || blob.type, lastModified: Date.now() }));
+            }
+            if (!cancelled) setMobileShare({ ...meta, loadedFiles });
+            window.history.replaceState({}, "", window.location.pathname);
+            return;
+          }
+        }
+
+        if (params.get("peachyShareFallback") === "1") {
+          const fallback: PeachySharePayload = {
+            id: `share-fallback-${Date.now()}`,
+            title: params.get("sharedTitle") || "Shared with PeachyPawz",
+            text: params.get("sharedText") || "",
+            url: params.get("sharedUrl") || "",
+            capturedAt: new Date().toISOString(),
+            files: [],
+            source: "share-target-fallback",
+            loadedFiles: [],
+          };
+          if (!cancelled) setMobileShare(fallback);
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      } catch {
+        // Sharing is an enhancement; the core timeline remains available.
+      }
+    };
+
+    void loadPeachyShare();
+    return () => { cancelled = true; };
+  }, []);
+
   const pet = userPets.find((item) => item.id === selectedPetId) || userPets[0] || null;
   const petEvents = useMemo(() => pet ? events.filter((event) => event.petId === pet.id).sort((a, b) => b.date.localeCompare(a.date)) : [], [events, pet]);
   const analytics = useMemo(() => pet ? analyzePet(events, pet.id) : null, [events, pet]);
@@ -218,6 +284,45 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
   const closeWebCapture = () => {
     try { sessionStorage.removeItem(webCaptureKey); } catch {}
     setWebCapture(null);
+  };
+  const clearMobileShareCache = async (share: PeachySharePayload | null) => {
+    if (!share || !("caches" in window)) return;
+    try {
+      const cache = await caches.open("peachypawz-share-v1");
+      await Promise.all((share.files || []).map((item) => cache.delete(item.key)));
+      await cache.delete(`/__peachy_share__/${encodeURIComponent(share.id)}/meta`);
+      const latest = await cache.match("/__peachy_share__/latest");
+      if ((await latest?.text()) === share.id) await cache.delete("/__peachy_share__/latest");
+    } catch {}
+  };
+  const closeMobileShare = () => {
+    const current = mobileShare;
+    setMobileShare(null);
+    void clearMobileShareCache(current);
+  };
+  const openSharedText = () => {
+    if (!mobileShare) return;
+    const text = [mobileShare.text, mobileShare.url].filter(Boolean).join("\n").trim();
+    setWebCapture({
+      id: mobileShare.id,
+      mode: "import",
+      title: mobileShare.title || "Shared mobile content",
+      url: /^https?:\/\//i.test(mobileShare.url) ? mobileShare.url : `${window.location.origin}/shared-content`,
+      text,
+      capturedAt: mobileShare.capturedAt,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      origin: "mobile-share",
+    });
+    const current = mobileShare;
+    setMobileShare(null);
+    void clearMobileShareCache(current);
+  };
+  const openSharedFile = (file: File) => {
+    const current = mobileShare;
+    setSharedUploadFile(file);
+    setMobileShare(null);
+    setUploadOpen(true);
+    void clearMobileShareCache(current);
   };
   const loadDemo = () => {
     setUserPets(demoPets);
@@ -319,7 +424,8 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
       {storyOpen && <StoryModal pet={pet} events={petEvents} allowAI={aiConsent && aiAvailable} onClose={() => setStoryOpen(false)} />}
       {vetOpen && <VetBriefModal pet={pet} events={petEvents} onClose={() => setVetOpen(false)} />}
       {addOpen && <AddEventSheet pet={pet} onAdd={addEvent} onClose={() => setAddOpen(false)} onUpload={() => { setAddOpen(false); setUploadOpen(true); }} />}
-      {uploadOpen && <UploadSheet pet={pet} existingEvents={petEvents} allowAI={aiConsent && aiAvailable} onAdd={addEvent} onClose={() => setUploadOpen(false)} />}
+      {uploadOpen && <UploadSheet pet={pet} existingEvents={petEvents} allowAI={aiConsent && aiAvailable} initialFile={sharedUploadFile} onAdd={addEvent} onClose={() => { setUploadOpen(false); setSharedUploadFile(null); }} />}
+      {mobileShare && <MobileShareSheet share={mobileShare} pet={pet} onUseText={openSharedText} onUseFile={openSharedFile} onClose={closeMobileShare} />}
       {petOpen && <AddPetSheet onAdd={addPet} onClose={() => setPetOpen(false)} />}
       {recordEvent && <RecordEditorSheet event={recordEvent} onSave={updateEvent} onDelete={deleteEvent} onClose={() => setRecordEvent(null)} />}
       {webCapture && <WebCaptureSheet capture={webCapture} pet={pet} existingEvents={petEvents} allowAI={aiConsent && aiAvailable} onAddMany={addEvents} onClose={closeWebCapture} />}
@@ -686,8 +792,8 @@ function AddEventSheet({ pet, onAdd, onClose, onUpload }: { pet: Pet; onAdd: (ev
   return <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Plus size={15} /> Manual entry</span><h2>Add to {pet.name}'s timeline</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div><div className="event-type-grid">{(["weight","activity","appetite","symptom","medication","vet","note"] as EventType[]).map((item) => <button className={type === item ? "active" : ""} onClick={() => setType(item)} key={item}><EventIcon type={item} /><span>{eventLabels[item]}</span></button>)}</div><form className="record-form" onSubmit={submit}><label><span>Date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label><span>{type === "weight" ? "Weight (kg)" : type === "activity" ? "Minutes per day" : eventLabels[type]}</span>{type === "appetite" ? <select value={value} onChange={(e) => setValue(e.target.value)}><option value="">Select</option><option>Normal</option><option>Reduced</option><option>Increased</option></select> : <textarea value={value} onChange={(e) => setValue(e.target.value)} placeholder={type === "weight" ? "e.g. 19.2" : type === "activity" ? "e.g. 68" : "Record what happened…"} />}</label><div className="form-note"><Info size={15} /> Missing data stays missing. PeachyPawz never treats “no record” as “normal.”</div><button className="button primary full" disabled={!value.trim()}>Save reviewed record</button></form><div className="drawer-divider"><span>or</span></div><button className="upload-callout" onClick={onUpload}><Upload size={20} /><span><strong>Import a document</strong><small>PDF, JPG or PNG · review before timeline</small></span><ChevronRight size={17} /></button></aside></div>;
 }
 
-function UploadSheet({ pet, existingEvents, allowAI, onAdd, onClose }: { pet: Pet; existingEvents: HealthEvent[]; allowAI: boolean; onAdd: (event: HealthEvent) => void; onClose: () => void }) {
-  const [file, setFile] = useState<File | null>(null); const [result, setResult] = useState<any>(null); const [loading, setLoading] = useState(false); const [date, setDate] = useState(todayDate()); const [weight, setWeight] = useState(""); const [fileHash, setFileHash] = useState("");
+function UploadSheet({ pet, existingEvents, allowAI, initialFile = null, onAdd, onClose }: { pet: Pet; existingEvents: HealthEvent[]; allowAI: boolean; initialFile?: File | null; onAdd: (event: HealthEvent) => void; onClose: () => void }) {
+  const [file, setFile] = useState<File | null>(initialFile); const [result, setResult] = useState<any>(null); const [loading, setLoading] = useState(false); const [date, setDate] = useState(todayDate()); const [weight, setWeight] = useState(""); const [fileHash, setFileHash] = useState("");
   const extract = async () => { if (!file) return; setLoading(true); let hash = fileHash; try { const bytes = await file.arrayBuffer(); const digest = await crypto.subtle.digest("SHA-256", bytes); hash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join(""); setFileHash(hash); } catch {} const form = new FormData(); form.set("file", file); form.set("allowAI", String(allowAI)); try { const res = await fetch("/api/documents/extract", { method: "POST", body: form }); const data = await res.json(); if (!res.ok) throw new Error(data.error); setResult(data); setDate(data.extraction.date || todayDate()); setWeight(data.extraction.weight?.value?.toString() || ""); } catch (error) { setResult({ error: error instanceof Error ? error.message : "Extraction failed" }); } finally { setLoading(false); } };
   const approve = () => {
     if (!result?.extraction) return;
@@ -760,9 +866,26 @@ function UploadSheet({ pet, existingEvents, allowAI, onAdd, onClose }: { pet: Pe
   const detectedName = result?.extraction?.petName?.trim();
   const nameMismatch = detectedName && detectedName.toLowerCase() !== pet.name.toLowerCase();
   const duplicate = Boolean(fileHash && existingEvents.some((event) => event.type === "document" && event.data.fileHash === fileHash));
-  return <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Upload size={15} /> Document intelligence</span><h2>Import a health record</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div>{!result?.extraction ? <><label className="drop-zone"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.txt" onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); setFileHash(""); }} /><span className="drop-icon"><FileText size={23} /></span><strong>{file ? file.name : "Choose a veterinary document"}</strong><p>PDF, JPG, PNG or TXT · max 8 MB</p><small>Nothing enters {pet.name}'s timeline until you review and approve it.</small></label>{result?.error && <div className="error-banner">{result.error}</div>}<button className="button primary full" onClick={extract} disabled={!file || loading}>{loading ? "Extracting…" : "Extract for review"}</button><div className="sample-tip"><FileSearch size={16} /><p>{allowAI ? "AI analysis is enabled for this import with your onboarding consent. PDF text still uses deterministic parsing where possible." : "AI analysis is off. Text-based PDF/TXT extraction still works; image files will require manual review."}</p></div></> : <div className="review-panel"><div className="review-banner"><ShieldCheck size={18} /><span><strong>Proposed fields — review required</strong><small>{result.extraction.confidence} confidence · {result.filename}</small></span></div>{result.extraction.warnings?.map((warning: string) => <div className="warning-line" key={warning}><Info size={15} /> {warning}</div>)}{nameMismatch && <div className="error-banner"><strong>Wrong-pet check:</strong> this document appears to mention “{detectedName}”, but you are importing into {pet.name}. Verify before approving.</div>}{duplicate && <div className="warning-line"><Info size={15} /> This exact file appears to have already been imported for {pet.name}. Review before creating a duplicate.</div>}<label><span>Assign to pet</span><select value={pet.name} disabled><option>{pet.name}</option></select><small>The destination pet is explicit. PeachyPawz never silently reassigns a health record.</small></label><label><span>Visit date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label><span>Weight</span><div className="input-with-unit"><input value={weight} onChange={(e) => setWeight(e.target.value)} /><span>{result.extraction.weight?.unit || "kg"}</span></div></label><label><span>Clinic</span><input value={result.extraction.clinic || ""} readOnly /></label><label><span>Extracted note</span><textarea value={result.extraction.followUp || result.extraction.notes || ""} readOnly /></label><button className="button primary full" onClick={approve}><Check size={17} /> Approve & add to {pet.name}'s timeline</button><button className="button secondary full" onClick={() => setResult(null)}>Choose a different file</button></div>}</aside></div>;
+  return <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Upload size={15} /> Document intelligence</span><h2>Import a health record</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div>{!result?.extraction ? <><label className="drop-zone"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); setFileHash(""); }} /><span className="drop-icon"><FileText size={23} /></span><strong>{file ? file.name : "Choose a veterinary document"}</strong><p>PDF, JPG, PNG, WebP or TXT · max 8 MB</p><small>Nothing enters {pet.name}'s timeline until you review and approve it.</small></label>{result?.error && <div className="error-banner">{result.error}</div>}<button className="button primary full" onClick={extract} disabled={!file || loading}>{loading ? "Extracting…" : "Extract for review"}</button><div className="sample-tip"><FileSearch size={16} /><p>{allowAI ? "AI analysis is enabled for this import with your onboarding consent. PDF text still uses deterministic parsing where possible." : "AI analysis is off. Text-based PDF/TXT extraction still works; image files will require manual review."}</p></div></> : <div className="review-panel"><div className="review-banner"><ShieldCheck size={18} /><span><strong>Proposed fields — review required</strong><small>{result.extraction.confidence} confidence · {result.filename}</small></span></div>{result.extraction.warnings?.map((warning: string) => <div className="warning-line" key={warning}><Info size={15} /> {warning}</div>)}{nameMismatch && <div className="error-banner"><strong>Wrong-pet check:</strong> this document appears to mention “{detectedName}”, but you are importing into {pet.name}. Verify before approving.</div>}{duplicate && <div className="warning-line"><Info size={15} /> This exact file appears to have already been imported for {pet.name}. Review before creating a duplicate.</div>}<label><span>Assign to pet</span><select value={pet.name} disabled><option>{pet.name}</option></select><small>The destination pet is explicit. PeachyPawz never silently reassigns a health record.</small></label><label><span>Visit date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label><span>Weight</span><div className="input-with-unit"><input value={weight} onChange={(e) => setWeight(e.target.value)} /><span>{result.extraction.weight?.unit || "kg"}</span></div></label><label><span>Clinic</span><input value={result.extraction.clinic || ""} readOnly /></label><label><span>Extracted note</span><textarea value={result.extraction.followUp || result.extraction.notes || ""} readOnly /></label><button className="button primary full" onClick={approve}><Check size={17} /> Approve & add to {pet.name}'s timeline</button><button className="button secondary full" onClick={() => setResult(null)}>Choose a different file</button></div>}</aside></div>;
 }
 
+
+function MobileShareSheet({ share, pet, onUseText, onUseFile, onClose }: { share: PeachySharePayload; pet: Pet; onUseText: () => void; onUseFile: (file: File) => void; onClose: () => void }) {
+  const hasText = Boolean(share.text.trim() || share.url.trim());
+  return <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <aside className="drawer form-drawer mobile-share-drawer">
+      <div className="drawer-head"><div><span className="section-kicker"><Upload size={15} /> Peachy Share</span><h2>Shared to PeachyPawz</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div>
+      <div className="share-hero"><span className="share-hero-icon">🐾</span><span><strong>{share.title || "Health information from your phone"}</strong><small>Review before anything enters {pet.name}'s timeline.</small></span></div>
+      {share.url && <div className="web-capture-source"><span className="web-source-icon">↗</span><span><strong>Shared link</strong><small>{share.url}</small></span></div>}
+      {share.text && <div className="captured-selection"><strong>Shared text</strong><p>{share.text.slice(0, 1200)}</p></div>}
+      {share.loadedFiles.length > 0 && <div className="share-file-list">{share.loadedFiles.map((file, index) => <button type="button" key={`${file.name}-${index}`} onClick={() => onUseFile(file)}><FileText size={19} /><span><strong>{file.name}</strong><small>{file.type || "Shared file"} · {(file.size / 1024 / 1024).toFixed(1)} MB</small></span><ChevronRight size={17} /></button>)}</div>}
+      {hasText && <button className="button primary full" onClick={onUseText}><MessageCircle size={17} /> Ask or review shared text</button>}
+      {!hasText && share.loadedFiles.length === 0 && <div className="error-banner">No supported text, image or PDF was received. Try sharing the visible text, a screenshot, or the health PDF.</div>}
+      <div className="form-note"><ShieldCheck size={15} /> Peachy Share is user-triggered. Shared content is staged for review and is not silently added to the health timeline.</div>
+      <button className="button secondary full" onClick={onClose}>Discard shared content</button>
+    </aside>
+  </div>;
+}
 
 
 function WebCaptureSheet({ capture, pet, existingEvents, allowAI, onAddMany, onClose }: { capture: WebCapture; pet: Pet; existingEvents: HealthEvent[]; allowAI: boolean; onAddMany: (events: HealthEvent[]) => void; onClose: () => void }) {
@@ -774,7 +897,8 @@ function WebCaptureSheet({ capture, pet, existingEvents, allowAI, onAddMany, onC
   const [date, setDate] = useState(todayDate());
   const [weight, setWeight] = useState("");
 
-  const host = (() => { try { return new URL(capture.url).hostname; } catch { return "captured webpage"; } })();
+  const host = (() => { try { return new URL(capture.url).hostname; } catch { return "shared content"; } })();
+  const fromMobileShare = capture.origin === "mobile-share";
   const detectedName = result?.extraction?.petName as string | null | undefined;
   const nameMismatch = Boolean(detectedName && detectedName.toLowerCase() !== pet.name.toLowerCase());
   const duplicate = Boolean(result?.fingerprint && existingEvents.some((event) => event.data.captureFingerprint === result.fingerprint));
@@ -818,7 +942,7 @@ function WebCaptureSheet({ capture, pet, existingEvents, allowAI, onAddMany, onC
     const common = {
       petId: pet.id,
       source: "imported" as const,
-      sourceLabel: `Web capture · ${host}`,
+      sourceLabel: `${fromMobileShare ? "Peachy Share" : "Web capture"} · ${host}`,
       sourceDocumentId,
       confidence,
       reviewStatus: "approved" as const,
@@ -890,7 +1014,7 @@ function WebCaptureSheet({ capture, pet, existingEvents, allowAI, onAddMany, onC
     onClose();
   };
 
-  return <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className="drawer form-drawer web-capture-drawer"><div className="drawer-head"><div><span className="section-kicker"><FileSearch size={15} /> Ask Peachy extension</span><h2>Captured from the web</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div><div className="web-capture-source"><span className="web-source-icon">↗</span><span><strong>{capture.title}</strong><small>{host}</small></span></div><div className="form-note"><ShieldCheck size={15} /> PeachyPawz received only visible text after you clicked the extension. This capture is not part of {pet.name}'s timeline until you approve it.</div>{capture.selectedText && <div className="captured-selection"><strong>Selected text</strong><p>{capture.selectedText.slice(0, 700)}</p></div>}<details className="web-capture-preview"><summary>Preview captured visible text</summary><pre>{(capture.selectedText || capture.text).slice(0, 2200)}</pre></details>{mode === "choose" && <div className="web-capture-actions"><button className="button dark full" onClick={() => setMode("ask")}><MessageCircle size={17} /> Ask about this page</button><button className="button primary full" onClick={analyzePage} disabled={loading}><Upload size={17} /> {loading ? "Analyzing…" : "Analyze for timeline import"}</button><button className="button secondary full" onClick={onClose}>Not now</button></div>}{mode === "ask" && <><form className="record-form web-ask-form" onSubmit={askPage}><label><span>Ask about the captured page</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="e.g. What medication and follow-up does this page mention?" /></label><button className="button dark full" disabled={loading || !question.trim()}><MessageCircle size={17} /> {loading ? "Reading page…" : "Ask Peachy"}</button></form>{answer && <div className="web-answer"><span className="scope-badge general">Captured page</span><p>{answer}</p></div>}<div className="web-capture-actions"><button className="button primary full" onClick={analyzePage} disabled={loading}><Upload size={17} /> Analyze & review for timeline</button><button className="button secondary full" onClick={onClose}>Close capture</button></div></>}{mode === "review" && result?.extraction && <div className="review-panel"><div className="review-banner"><ShieldCheck size={18} /><span><strong>Proposed fields — review required</strong><small>{result.extraction.confidence} confidence · {result.mode === "ai" ? "AI-assisted" : "deterministic extraction"}</small></span></div>{result.extraction.warnings?.map((warning: string) => <div className="warning-line" key={warning}><Info size={15} /> {warning}</div>)}{nameMismatch && <div className="error-banner"><strong>Wrong-pet check:</strong> this page appears to mention “{detectedName}”, but the selected timeline belongs to {pet.name}. Verify before importing.</div>}{duplicate && <div className="error-banner"><strong>Duplicate capture:</strong> this exact page content was already approved for {pet.name}. PeachyPawz will not import it twice.</div>}<label><span>Assign to pet</span><select value={pet.name} disabled><option>{pet.name}</option></select></label><label><span>Record date</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label><span>Weight</span><div className="input-with-unit"><input inputMode="decimal" value={weight} onChange={(event) => setWeight(event.target.value)} /><span>{result.extraction.weight?.unit || "kg"}</span></div></label><label><span>Clinic</span><input value={result.extraction.clinic || ""} readOnly /></label><label><span>Extracted note</span><textarea value={result.extraction.followUp || result.extraction.notes || ""} readOnly /></label><button className="button primary full" onClick={approve} disabled={duplicate || nameMismatch}><Check size={17} /> Approve & add to {pet.name}'s timeline</button>{nameMismatch && <small className="web-review-help">Switch to the correct pet before importing rather than forcing a mismatched record.</small>}<button className="button secondary full" onClick={() => setMode("ask")}><MessageCircle size={16} /> Ask about page instead</button></div>}<div className="web-capture-footer"><span>Source URL retained for provenance</span><button type="button" onClick={() => window.open(capture.url, "_blank", "noopener,noreferrer")}>Open source ↗</button></div></aside></div>;
+  return <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className="drawer form-drawer web-capture-drawer"><div className="drawer-head"><div><span className="section-kicker"><FileSearch size={15} /> {fromMobileShare ? "Peachy Share" : "Ask Peachy extension"}</span><h2>{fromMobileShare ? "Shared from your phone" : "Captured from the web"}</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div><div className="web-capture-source"><span className="web-source-icon">↗</span><span><strong>{capture.title}</strong><small>{host}</small></span></div><div className="form-note"><ShieldCheck size={15} /> {fromMobileShare ? "PeachyPawz received only the content you explicitly shared from your phone." : "PeachyPawz received only visible text after you clicked the extension."} This capture is not part of {pet.name}'s timeline until you approve it.</div>{capture.selectedText && <div className="captured-selection"><strong>Selected text</strong><p>{capture.selectedText.slice(0, 700)}</p></div>}<details className="web-capture-preview"><summary>Preview captured visible text</summary><pre>{(capture.selectedText || capture.text).slice(0, 2200)}</pre></details>{mode === "choose" && <div className="web-capture-actions"><button className="button dark full" onClick={() => setMode("ask")}><MessageCircle size={17} /> Ask about this page</button><button className="button primary full" onClick={analyzePage} disabled={loading}><Upload size={17} /> {loading ? "Analyzing…" : "Analyze for timeline import"}</button><button className="button secondary full" onClick={onClose}>Not now</button></div>}{mode === "ask" && <><form className="record-form web-ask-form" onSubmit={askPage}><label><span>Ask about the captured page</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="e.g. What medication and follow-up does this page mention?" /></label><button className="button dark full" disabled={loading || !question.trim()}><MessageCircle size={17} /> {loading ? "Reading page…" : "Ask Peachy"}</button></form>{answer && <div className="web-answer"><span className="scope-badge general">Captured page</span><p>{answer}</p></div>}<div className="web-capture-actions"><button className="button primary full" onClick={analyzePage} disabled={loading}><Upload size={17} /> Analyze & review for timeline</button><button className="button secondary full" onClick={onClose}>Close capture</button></div></>}{mode === "review" && result?.extraction && <div className="review-panel"><div className="review-banner"><ShieldCheck size={18} /><span><strong>Proposed fields — review required</strong><small>{result.extraction.confidence} confidence · {result.mode === "ai" ? "AI-assisted" : "deterministic extraction"}</small></span></div>{result.extraction.warnings?.map((warning: string) => <div className="warning-line" key={warning}><Info size={15} /> {warning}</div>)}{nameMismatch && <div className="error-banner"><strong>Wrong-pet check:</strong> this page appears to mention “{detectedName}”, but the selected timeline belongs to {pet.name}. Verify before importing.</div>}{duplicate && <div className="error-banner"><strong>Duplicate capture:</strong> this exact page content was already approved for {pet.name}. PeachyPawz will not import it twice.</div>}<label><span>Assign to pet</span><select value={pet.name} disabled><option>{pet.name}</option></select></label><label><span>Record date</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label><span>Weight</span><div className="input-with-unit"><input inputMode="decimal" value={weight} onChange={(event) => setWeight(event.target.value)} /><span>{result.extraction.weight?.unit || "kg"}</span></div></label><label><span>Clinic</span><input value={result.extraction.clinic || ""} readOnly /></label><label><span>Extracted note</span><textarea value={result.extraction.followUp || result.extraction.notes || ""} readOnly /></label><button className="button primary full" onClick={approve} disabled={duplicate || nameMismatch}><Check size={17} /> Approve & add to {pet.name}'s timeline</button>{nameMismatch && <small className="web-review-help">Switch to the correct pet before importing rather than forcing a mismatched record.</small>}<button className="button secondary full" onClick={() => setMode("ask")}><MessageCircle size={16} /> Ask about page instead</button></div>}<div className="web-capture-footer"><span>Source URL retained for provenance</span><button type="button" onClick={() => window.open(capture.url, "_blank", "noopener,noreferrer")}>Open source ↗</button></div></aside></div>;
 }
 
 

@@ -700,3 +700,28 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .web-capture-preview summary { cursor:pointer; padding:11px 12px; font-size:9px; font-weight:800; color:var(--muted); }
 .web-capture-preview pre { margin:0; padding:0 12px 12px; max-height:180px; overflow:auto; white-space:pre-wrap; word-break:break-word; font:9px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:#5f5a54; }
 @media (max-width:720px) { .web-capture-preview summary, .web-capture-preview pre { font-size:10px; } }
+
+/* Peachy Share — Android PWA share-sheet handoff */
+.mobile-share-drawer { max-width: 520px; }
+.share-hero { display:flex; align-items:center; gap:12px; padding:14px; margin-bottom:12px; border:1px solid #eaded2; border-radius:16px; background:linear-gradient(135deg,#fffaf5,#fff); }
+.share-hero-icon { width:42px; height:42px; display:grid; place-items:center; border-radius:14px 14px 14px 5px; background:var(--peach-soft); font-size:20px; flex:0 0 auto; }
+.share-hero > span:last-child { min-width:0; }
+.share-hero strong,.share-hero small { display:block; }
+.share-hero strong { font-size:12px; color:var(--ink); }
+.share-hero small { margin-top:3px; font-size:9px; line-height:1.45; color:var(--muted); }
+.share-file-list { display:grid; gap:8px; margin:10px 0 12px; }
+.share-file-list button { width:100%; display:grid; grid-template-columns:34px minmax(0,1fr) 18px; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:14px; background:#fff; text-align:left; color:var(--ink); cursor:pointer; }
+.share-file-list button:hover { border-color:#ddb999; background:#fffaf5; }
+.share-file-list button > span { min-width:0; }
+.share-file-list strong,.share-file-list small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.share-file-list strong { font-size:10.5px; }
+.share-file-list small { margin-top:2px; font-size:8.5px; color:var(--muted); }
+@media (max-width:720px) {
+  .mobile-share-drawer { max-width:none; }
+  .share-hero { padding:13px; }
+  .share-hero strong { font-size:13px; }
+  .share-hero small { font-size:10px; }
+  .share-file-list button { min-height:58px; }
+  .share-file-list strong { font-size:12px; }
+  .share-file-list small { font-size:10px; }
+}

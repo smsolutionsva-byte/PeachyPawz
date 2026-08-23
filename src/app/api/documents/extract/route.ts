@@ -5,7 +5,7 @@ import { getAIClient } from "@/lib/ai/provider";
 
 export const runtime = "nodejs";
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "text/plain"]);
+const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp", "text/plain"]);
 
 async function extractPdf(buffer: Buffer) {
   const parser = (await import("pdf-parse")).default;
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     const file = form.get("file");
     const allowAI = form.get("allowAI") === "true";
     if (!(file instanceof File)) return NextResponse.json({ error: "A file is required." }, { status: 400 });
-    if (!allowed.has(file.type)) return NextResponse.json({ error: "Unsupported file type. Use PDF, JPG, PNG, or TXT." }, { status: 415 });
+    if (!allowed.has(file.type)) return NextResponse.json({ error: "Unsupported file type. Use PDF, JPG, PNG, WebP, or TXT." }, { status: 415 });
     if (file.size > MAX_FILE_BYTES) return NextResponse.json({ error: "File is larger than the 8 MB demo limit." }, { status: 413 });
 
     const buffer = Buffer.from(await file.arrayBuffer());

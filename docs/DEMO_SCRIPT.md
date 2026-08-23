@@ -177,3 +177,21 @@ Say:
 > “The same intelligence layer can reduce capture friction. On web, this can be a user-triggered browser companion; on native, the same pattern becomes Share → PeachyPawz. In both cases AI proposes and the human approves.”
 
 Do not make the evaluator install the extension unless there is time. A short screen recording is an acceptable backup for this bonus feature.
+
+
+## Optional 30-second mobile “one more thing” — Peachy Share
+
+If an Android phone is available and PeachyPawz is installed as a PWA:
+
+1. Open the included synthetic clinic portal or the sample Max PDF.
+2. Use Android **Share**.
+3. Choose **PeachyPawz**.
+4. Show the Peachy Share staging drawer.
+5. Explain that the payload is still unverified.
+6. Continue to Ask / Analyze / Review and approve only after the pet check.
+
+Say:
+
+> “Desktop uses an explicit browser companion; Android uses the operating system Share Sheet. The capture surface changes, but both feed the same human-reviewed health-data pipeline.”
+
+Do not claim the PWA Share Target works identically on iOS. The iOS native roadmap uses a Share Extension.

@@ -35,6 +35,14 @@ Mail / Files / WhatsApp / Vet portal
 
 This is one of the highest-value native advantages because it converts existing digital paperwork into the timeline with very little re-navigation.
 
+### Web-to-native bridge already prototyped
+
+The web submission now includes **Peachy Share** on compatible installed Android PWAs. Android can receive selected text, links, screenshots/images and PDFs through the system Share Sheet, stage them locally, then reuse the existing PeachyPawz review pipeline.
+
+This is intentionally a bridge, not the final native implementation. Native Android should evolve it into `ACTION_SEND` / `ACTION_SEND_MULTIPLE` handling, while iOS should use a Share Extension.
+
+See `docs/PEACHY_SHARE.md` and `docs/IOS_SHARE_ROADMAP.md`.
+
 ### Notifications
 
 Use local notifications when the reminder is fully known on device. Use push for server-side changes such as connected-source imports or shared-care updates.
