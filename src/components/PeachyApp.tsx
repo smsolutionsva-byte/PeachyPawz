@@ -16,7 +16,6 @@ import {
   FileText,
   Home,
   Info,
-  Menu,
   MessageCircle,
   MoreHorizontal,
   Plus,
@@ -111,6 +110,7 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
   const [vetOpen, setVetOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -197,16 +197,18 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
           <span><strong>Prepare for Vet</strong><small>Create a factual 90-day brief</small></span>
           <ChevronRight size={16} />
         </button>
-        <div className="ai-setting"><span className={aiConsent && aiAvailable ? "online" : ""} /><div><strong>AI analysis</strong><small>{aiConsent && aiAvailable ? "Enabled with consent" : aiAvailable ? "Off for this pet" : "Server key not configured"}</small></div></div>
-        <button className="ghost-link" onClick={resetProfile}>Start over / clear local data</button>
-        <form action={signOutAction}><button className="ghost-link" type="submit">Sign out</button></form>
-        <p className="sidebar-footnote">Signed in as {user.email || user.name || "Google user"}</p>
+        <p className="sidebar-privacy"><ShieldCheck size={14} /> Records stay scoped to the selected pet.</p>
       </aside>
 
       <main className="main-shell">
         <header className="mobile-header">
           <BrandMark compact />
-          <button className="icon-button" aria-label="Menu"><Menu size={21} /></button>
+          <div className="mobile-header-actions">
+            <PetSwitcher pet={pet} pets={userPets} selectedId={selectedPetId} onSelect={setSelectedPetId} />
+            <button className="account-avatar-button mobile-account-button" aria-label="Open account menu" onClick={() => setAccountOpen((value) => !value)}>
+              {user.image ? <img src={user.image} alt="" /> : <span>{(user.name || user.email || "U")[0]?.toUpperCase()}</span>}
+            </button>
+          </div>
         </header>
 
         <div className="topbar">
@@ -218,12 +220,20 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
             <PetSwitcher pet={pet} pets={userPets} selectedId={selectedPetId} onSelect={setSelectedPetId} />
             <button className="button secondary desktop-only" onClick={() => setUploadOpen(true)}><Upload size={17} /> Import record</button>
             <button className="button primary desktop-only" onClick={() => setAddOpen(true)}><Plus size={17} /> Add record</button>
+            <div className="account-menu-wrap desktop-account">
+              <button className="account-avatar-button" aria-label="Open account menu" onClick={() => setAccountOpen((value) => !value)}>
+                {user.image ? <img src={user.image} alt="" /> : <span>{(user.name || user.email || "U")[0]?.toUpperCase()}</span>}
+              </button>
+              {accountOpen && <AccountMenu user={user} aiAvailable={aiAvailable} aiConsent={aiConsent} onReset={() => { setAccountOpen(false); if (window.confirm("Start fresh? This clears PeachyPawz data saved in this browser for this account.")) resetProfile(); }} signOutAction={signOutAction} />}
+            </div>
           </div>
         </div>
 
+        {accountOpen && <div className="mobile-account-popover"><AccountMenu user={user} aiAvailable={aiAvailable} aiConsent={aiConsent} onReset={() => { setAccountOpen(false); if (window.confirm("Start fresh? This clears PeachyPawz data saved in this browser for this account.")) resetProfile(); }} signOutAction={signOutAction} /></div>}
+
         <section className="content-wrap">
           {view === "home" && (
-            <HomeView pet={pet} events={petEvents} analytics={analytics} onEvidence={setEvidenceIds} onStory={() => setStoryOpen(true)} onVet={() => setVetOpen(true)} onAsk={() => setView("ask")} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} onDemo={loadDemo} />
+            <HomeView pet={pet} events={petEvents} analytics={analytics} onEvidence={setEvidenceIds} onStory={() => setStoryOpen(true)} onVet={() => setVetOpen(true)} onAsk={() => setView("ask")} onTimeline={() => setView("timeline")} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} onDemo={loadDemo} />
           )}
           {view === "timeline" && <TimelineView pet={pet} events={petEvents} onAdd={() => setAddOpen(true)} onUpload={() => setUploadOpen(true)} />}
           {view === "insights" && <InsightsView pet={pet} analytics={analytics} events={petEvents} onEvidence={setEvidenceIds} onStory={() => setStoryOpen(true)} />}
@@ -244,6 +254,24 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
       {vetOpen && <VetBriefModal pet={pet} events={petEvents} onClose={() => setVetOpen(false)} />}
       {addOpen && <AddEventSheet pet={pet} onAdd={addEvent} onClose={() => setAddOpen(false)} onUpload={() => { setAddOpen(false); setUploadOpen(true); }} />}
       {uploadOpen && <UploadSheet pet={pet} allowAI={aiConsent && aiAvailable} onAdd={addEvent} onClose={() => setUploadOpen(false)} />}
+    </div>
+  );
+}
+
+function AccountMenu({ user, aiAvailable, aiConsent, onReset, signOutAction }: { user: AuthUser; aiAvailable: boolean; aiConsent: boolean; onReset: () => void; signOutAction: () => Promise<void> }) {
+  return (
+    <div className="account-menu" role="dialog" aria-label="Account menu">
+      <div className="account-menu-user">
+        <span className="account-menu-avatar">{user.image ? <img src={user.image} alt="" /> : (user.name || user.email || "U")[0]?.toUpperCase()}</span>
+        <span><strong>{user.name || "PeachyPawz account"}</strong><small>{user.email || "Signed in with Google"}</small></span>
+      </div>
+      <div className="account-menu-status">
+        <span className={aiConsent && aiAvailable ? "account-status-dot online" : "account-status-dot"} />
+        <span><strong>AI assistance</strong><small>{aiConsent && aiAvailable ? "Enabled for this pet" : aiAvailable ? "Off for this pet" : "AI features unavailable"}</small></span>
+      </div>
+      <div className="account-menu-divider" />
+      <button type="button" onClick={onReset}>Reset pet workspace</button>
+      <form action={signOutAction}><button type="submit">Sign out</button></form>
     </div>
   );
 }
@@ -338,7 +366,7 @@ function PetSwitcher({ pet, pets, selectedId, onSelect }: { pet: Pet; pets: Pet[
   );
 }
 
-function HomeView({ pet, events, analytics, onEvidence, onStory, onVet, onAsk, onAdd, onUpload, onDemo }: any) {
+function HomeView({ pet, events, analytics, onEvidence, onStory, onVet, onAsk, onTimeline, onAdd, onUpload, onDemo }: any) {
   const weight = metricSeries(events, pet.id, "weight");
   const activity = metricSeries(events, pet.id, "activity");
   const recent = events.slice(0, 4);
@@ -348,65 +376,98 @@ function HomeView({ pet, events, analytics, onEvidence, onStory, onVet, onAsk, o
   if (events.length < 3) return <EmptyState pet={pet} eventCount={events.length} onAdd={onAdd} onUpload={onUpload} onDemo={onDemo} />;
 
   const changed = analytics.status === "changes";
+  const reliableBaselines = analytics.baselines.filter((item: any) => item.state === "reliable").length;
+  const sourceCount = new Set(events.map((event: HealthEvent) => event.source)).size;
+  const latestWeight = weight.at(-1)?.value;
+  const latestActivity = activity.at(-1)?.value;
+  const recordPeriod = earliest && latest ? `${shortDate(earliest)} — ${shortDate(latest)}` : "Starting now";
+
   return (
-    <div className="dashboard-grid">
-      <div className="dashboard-main">
-        <section className="status-card">
-          <div className="status-row">
-            <div>
-              <span className={`status-pill ${changed ? "changes" : "stable"}`}><span /> {changed ? "Changes detected" : "Building context"}</span>
-              <h2>{changed ? `${pet.name}'s recent health story has a meaningful shift.` : `PeachyPawz is learning ${pet.name}'s normal.`}</h2>
-              <p>{analytics.statusReason}</p>
+    <div className="home-layout">
+      <div className="home-main">
+        <section className={`home-hero ${changed ? "has-change" : "is-learning"}`}>
+          <div className="home-hero-copy">
+            <span className={`status-pill ${changed ? "changes" : "stable"}`}><span /> {changed ? "Changes detected" : "Learning baseline"}</span>
+            <p className="home-overline">Today with {pet.name}</p>
+            <h2>{changed ? `A few things shifted in ${pet.name}'s recent pattern.` : `PeachyPawz is learning what normal looks like for ${pet.name}.`}</h2>
+            <p className="home-hero-summary">{analytics.primaryInsight.summary}</p>
+            <div className="home-hero-actions">
+              <button className="button primary" disabled={!analytics.primaryInsight.evidenceIds.length} onClick={() => onEvidence(analytics.primaryInsight.evidenceIds)}><CircleHelp size={16} /> See the evidence</button>
+              <button className="button hero-secondary" onClick={onStory}><Sparkles size={16} /> Read health story</button>
             </div>
-            <div className="status-meta"><span>Available record range</span><strong>{earliest && latest ? `${shortDate(earliest)} — ${shortDate(latest)}` : "Starting now"}</strong></div>
+            <p className="home-safety"><ShieldCheck size={14} /> Based on {pet.name}'s available records. This is not a diagnosis.</p>
           </div>
-          <div className="micro-note"><ShieldCheck size={15} /> Based only on available records — not a diagnosis.</div>
+          <div className="home-hero-visual" aria-hidden="true">
+            <div className="story-orbit orbit-a" />
+            <div className="story-orbit orbit-b" />
+            <div className="story-core"><span>{pet.species === "Cat" ? "🐱" : "🐶"}</span><strong>{pet.name}</strong><small>Health story</small></div>
+            <div className="story-chip chip-weight"><EventIcon type="weight" /><span><small>Weight</small><strong>{latestWeight ? `${latestWeight} kg` : "Tracked"}</strong></span></div>
+            <div className="story-chip chip-activity"><EventIcon type="activity" /><span><small>Activity</small><strong>{latestActivity ? `${latestActivity} min` : "Tracked"}</strong></span></div>
+            <div className="story-chip chip-evidence"><FileSearch size={15} /><span><small>Evidence</small><strong>{analytics.primaryInsight.evidenceIds.length} linked</strong></span></div>
+          </div>
         </section>
 
-        <section className="section-block">
-          <div className="section-heading"><div><span className="section-kicker"><Sparkles size={15} /> What changed?</span><h2>{analytics.changes.length ? `Changes found across ${analytics.changes.length} tracked signal${analytics.changes.length === 1 ? "" : "s"}` : "No meaningful change can be calculated yet"}</h2></div><span className="time-chip">Your records</span></div>
-          <div className="change-grid">
+        <section className="home-quick-actions" aria-label="Quick actions">
+          <button onClick={onAdd}><span><Plus size={18} /></span><div><strong>Add record</strong><small>Weight, symptom, note</small></div><ChevronRight size={16} /></button>
+          <button onClick={onUpload}><span><Upload size={18} /></span><div><strong>Import document</strong><small>Review before saving</small></div><ChevronRight size={16} /></button>
+          <button onClick={onAsk}><span><MessageCircle size={18} /></span><div><strong>Ask about {pet.name}</strong><small>Grounded in the timeline</small></div><ChevronRight size={16} /></button>
+          <button onClick={onVet}><span><Stethoscope size={18} /></span><div><strong>Prepare for Vet</strong><small>Build a factual brief</small></div><ChevronRight size={16} /></button>
+        </section>
+
+        <section className="section-block home-section">
+          <div className="section-heading"><div><span className="section-kicker"><Sparkles size={15} /> What changed?</span><h2>Changes that stand out from the timeline</h2></div><span className="time-chip">{recordPeriod}</span></div>
+          <div className="change-grid home-change-grid">
             {analytics.changes.map((change: any) => (
-              <button className="change-card" key={change.metric} onClick={() => onEvidence(change.evidenceIds)}>
+              <button className="change-card home-change-card" key={change.metric} onClick={() => onEvidence(change.evidenceIds)}>
                 <div className={`metric-icon ${change.metric}`}><EventIcon type={change.metric} /></div>
                 <div className="change-copy"><span>{change.label}</span><strong>{change.from} <ArrowRight size={14} /> {change.to}</strong><small className={change.direction === "up" ? "up" : change.direction === "down" ? "down" : "neutral"}>{change.changePercent !== undefined ? <>{change.direction === "up" ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />} {Math.abs(change.changePercent).toFixed(1)}%</> : "Recorded state changed"}</small></div>
                 <ChevronRight size={17} className="card-chevron" />
               </button>
             ))}
-            {analytics.changes.length === 0 && <div className="quiet-card"><strong>More history → better context</strong><p>Add repeat measurements over time and PeachyPawz will compare new values against this pet's own earlier pattern.</p></div>}
+            {analytics.changes.length === 0 && <div className="quiet-card"><strong>More history → better context</strong><p>Add repeat measurements and PeachyPawz will compare new values with this pet's earlier pattern.</p></div>}
           </div>
         </section>
 
-        <section className="insight-hero">
-          <div className="insight-head"><span className="ai-orb"><Bot size={19} /></span><span><small>Peachy Intelligence</small><strong>{analytics.primaryInsight.title}</strong></span><span className="confidence-pill">{analytics.primaryInsight.confidence}</span></div>
-          <p className="insight-text">{analytics.primaryInsight.summary}</p>
-          {analytics.changes.length >= 2 && <div className="relationship">{analytics.changes.map((change: any, index: number) => <span key={change.metric} style={{ display: "contents" }}><span>{change.label} {change.direction === "up" ? "↑" : change.direction === "down" ? "↓" : "changed"}</span>{index < analytics.changes.length - 1 && <ArrowRight size={15} />}</span>)}</div>}
-          <p className="causation-note"><Info size={14} /> PeachyPawz can describe timing and correlation, but does not manufacture causation or diagnoses.</p>
-          <div className="insight-actions"><button className="button dark" disabled={!analytics.primaryInsight.evidenceIds.length} onClick={() => onEvidence(analytics.primaryInsight.evidenceIds)}><CircleHelp size={16} /> Why am I seeing this?</button><button className="text-button" onClick={onStory}>Read health story <ArrowRight size={15} /></button></div>
+        <section className="home-insight-panel">
+          <div className="home-insight-icon"><Bot size={20} /></div>
+          <div className="home-insight-body">
+            <div className="home-insight-top"><span><small>Peachy Intelligence</small><strong>{analytics.primaryInsight.title}</strong></span><span className="confidence-pill">{analytics.primaryInsight.confidence}</span></div>
+            <p>{analytics.primaryInsight.summary}</p>
+            {analytics.changes.length >= 2 && <div className="relationship compact">{analytics.changes.map((change: any, index: number) => <span key={change.metric} style={{ display: "contents" }}><span>{change.label} {change.direction === "up" ? "↑" : change.direction === "down" ? "↓" : "changed"}</span>{index < analytics.changes.length - 1 && <ArrowRight size={15} />}</span>)}</div>}
+            <div className="home-next-action"><span>Responsible next step</span><strong>{analytics.primaryInsight.responsibleAction}</strong></div>
+            <div className="insight-actions"><button className="text-button" disabled={!analytics.primaryInsight.evidenceIds.length} onClick={() => onEvidence(analytics.primaryInsight.evidenceIds)}>Why am I seeing this? <ArrowRight size={15} /></button><button className="text-button" onClick={onStory}>Full story <ArrowRight size={15} /></button></div>
+          </div>
         </section>
 
-        <section className="section-block trends-section">
-          <div className="section-heading"><div><span className="section-kicker"><Activity size={15} /> Personal baseline</span><h2>Compared with {pet.name}'s own normal</h2></div></div>
+        <section className="section-block trends-section home-section">
+          <div className="section-heading"><div><span className="section-kicker"><Activity size={15} /> Personal baseline</span><h2>Compared with {pet.name}'s own normal</h2></div><span className="baseline-readiness">{reliableBaselines ? `${reliableBaselines}/2 reliable` : "Still learning"}</span></div>
           <div className="trend-grid">
-            <MetricTrend title="Weight" series={weight.map((item) => item.value)} value={`${weight.at(-1)?.value ?? "—"} kg`} baseline={analytics.baselines.find((item: any) => item.metric === "weight")} />
-            <MetricTrend title="Activity" series={activity.map((item) => item.value)} value={`${activity.at(-1)?.value ?? "—"} min/day`} baseline={analytics.baselines.find((item: any) => item.metric === "activity")} inverse />
+            <MetricTrend title="Weight" series={weight.map((item) => item.value)} value={`${latestWeight ?? "—"} kg`} baseline={analytics.baselines.find((item: any) => item.metric === "weight")} />
+            <MetricTrend title="Activity" series={activity.map((item) => item.value)} value={`${latestActivity ?? "—"} min/day`} baseline={analytics.baselines.find((item: any) => item.metric === "activity")} inverse />
           </div>
         </section>
 
-        <section className="section-block">
-          <div className="section-heading"><div><span className="section-kicker"><CalendarDays size={15} /> Recent timeline</span><h2>The records behind the story</h2></div></div>
-          <div className="timeline-preview">{recent.map((event: HealthEvent) => <TimelineRow key={event.id} event={event} />)}</div>
+        <section className="section-block home-section">
+          <div className="section-heading"><div><span className="section-kicker"><CalendarDays size={15} /> Recent timeline</span><h2>The records behind the story</h2></div><button className="text-button" onClick={onTimeline}>View timeline <ArrowRight size={15} /></button></div>
+          <div className="timeline-preview home-timeline">{recent.map((event: HealthEvent) => <TimelineRow key={event.id} event={event} />)}</div>
         </section>
       </div>
 
-      <aside className="dashboard-side">
-        <section className="side-card pet-card">
-          <div className="pet-profile-top"><span className="pet-avatar xl" style={{ background: pet.color }}>{pet.name[0]}</span><div><h3>{pet.name}</h3><p>{pet.breed} · {ageLabel(pet.birthDate)}</p></div><button className="icon-button"><MoreHorizontal size={18} /></button></div>
-          <div className="pet-stat-row"><span><small>Sex</small><strong>{pet.sex}</strong></span><span><small>Latest weight</small><strong>{weight.at(-1)?.value ? `${weight.at(-1)?.value} kg` : "Not recorded"}</strong></span></div>
+      <aside className="home-side">
+        <section className="home-side-card pet-overview-card">
+          <div className="pet-profile-top"><span className="pet-avatar xl" style={{ background: pet.color }}>{pet.name[0]}</span><div><span className="tiny-label">Your pet</span><h3>{pet.name}</h3><p>{pet.breed || pet.species} · {ageLabel(pet.birthDate)}</p></div></div>
+          <div className="pet-overview-stats"><span><small>Sex</small><strong>{pet.sex}</strong></span><span><small>Latest weight</small><strong>{latestWeight ? `${latestWeight} kg` : "Not recorded"}</strong></span></div>
         </section>
-        <section className="side-card action-card peach"><span className="side-card-icon"><MessageCircle size={19} /></span><h3>Ask about {pet.name}</h3><p>Questions are grounded in {pet.name}'s timeline, not another pet's data.</p><button className="button white" onClick={onAsk}>Ask a question <ArrowRight size={15} /></button></section>
-        <section className="side-card action-card mint"><span className="side-card-icon"><Stethoscope size={19} /></span><h3>Preparing for a visit?</h3><p>Turn the available history into a concise, traceable briefing for your veterinarian.</p><button className="button white" onClick={onVet}>Prepare for Vet <ArrowRight size={15} /></button></section>
-        {vaccineReminder && <section className="side-card reminder-card"><div className="reminder-title"><span className="side-card-icon subtle"><CalendarDays size={18} /></span><div><small>Upcoming</small><strong>{vaccineReminder.title}</strong></div></div><p>Due {shortDate(vaccineReminder.date)} · {sourceText(vaccineReminder)}</p></section>}
+
+        <section className="home-side-card continuity-card">
+          <div className="side-card-heading"><span className="side-card-icon subtle"><FileSearch size={18} /></span><div><small>Timeline coverage</small><strong>Your story has context</strong></div></div>
+          <div className="coverage-grid"><span><strong>{events.length}</strong><small>records</small></span><span><strong>{sourceCount}</strong><small>source{sourceCount === 1 ? "" : "s"}</small></span><span><strong>{reliableBaselines}/2</strong><small>baselines</small></span></div>
+          <p>{recordPeriod}</p>
+        </section>
+
+        {vaccineReminder ? <section className="home-side-card care-card"><div className="side-card-heading"><span className="side-card-icon subtle"><CalendarDays size={18} /></span><div><small>Upcoming care</small><strong>{vaccineReminder.title}</strong></div></div><p>Due {shortDate(vaccineReminder.date)} · {sourceText(vaccineReminder)}</p><button className="text-button" onClick={onTimeline}>See record <ArrowRight size={15} /></button></section> : <section className="home-side-card care-card"><div className="side-card-heading"><span className="side-card-icon subtle"><CalendarDays size={18} /></span><div><small>Upcoming care</small><strong>No due items recorded</strong></div></div><p>Add vaccinations, follow-ups or medications to keep care dates visible here.</p></section>}
+
+        <section className="home-side-card trust-card"><ShieldCheck size={18} /><div><strong>Explainable by design</strong><p>Insights link back to the records and calculations that produced them.</p></div></section>
       </aside>
     </div>
   );
