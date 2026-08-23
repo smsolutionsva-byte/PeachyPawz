@@ -1,0 +1,10 @@
+Oak & Paw Clinic — Veterinary Visit Summary
+Pet: Max
+Species: Dog
+Visit Date: 2026-08-22
+Clinic: Oak & Paw Clinic
+Weight: 19.6 kg
+Reason: Follow-up review of activity and appetite observations.
+Plan: Continue recording activity and appetite for 14 days and review with veterinarian if changes persist.
+Medication: No medication change recorded at this visit.
+Synthetic demo document. Not a real medical record.
