@@ -48,3 +48,13 @@ This matrix makes scope explicit and avoids overstating prototype capabilities.
 ## Scope rationale
 
 The challenge asks for a strong mobile-web prototype plus native readiness, not a complete veterinary platform. The MVP therefore prioritizes the high-value intelligence loop and deliberately defers connectors, wearables, complex sharing and sync infrastructure.
+
+
+## Bonus traceability: fragmented-source capture
+
+| Challenge theme | PeachyPawz evidence | Status |
+|---|---|---|
+| Reduce fragmented-record friction | Optional Ask Peachy browser companion captures user-visible authorized page data | ✅ Prototype bonus |
+| Conversational interaction | Ask questions about a captured page before import | ✅ Prototype bonus |
+| Responsible automation | Captured page is not timeline evidence until review/approval | ✅ Implemented |
+| Connected sources / future native | Extension demonstrates the same human-in-the-loop pattern as future OAuth connectors and native Share Sheet | 🧭 Architecture path |

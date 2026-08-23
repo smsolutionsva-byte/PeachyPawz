@@ -112,3 +112,10 @@ Production records should capture:
 - creation/superseded timestamps
 
 That makes “Why did the product say this?” answerable after data changes.
+
+
+## Browser extension threat model
+
+The optional Ask Peachy companion uses `activeTab` instead of broad browsing permissions. Capture occurs only after an explicit toolbar click and uses visible `innerText`, not form values. The temporary handoff expires and is deleted after acknowledgement.
+
+Captured webpage text is untrusted input and receives the same prompt-injection treatment as uploaded documents. Import requires authenticated PeachyPawz review, wrong-pet checks and explicit approval. Production should prefer official OAuth/API connectors where available and treat extension capture as a user-initiated fallback.

@@ -202,3 +202,19 @@ Do not prematurely split microservices. Introduce infrastructure when workload r
 6. analytics observability
 
 Domain APIs can later separate into Pet, Records, Documents, Analytics, AI and Notification services while preserving the same event/evidence contracts.
+
+
+## Browser companion ingestion (bonus)
+
+```mermaid
+flowchart LR
+    P[Authorized webpage] -->|user clicks extension| X[activeTab visible-text capture]
+    X --> B[PeachyPawz bridge]
+    B --> R[Authenticated review drawer]
+    R --> Q[Ask about captured page]
+    R --> E[Extraction proposal]
+    E --> V[Wrong-pet + duplicate checks]
+    V -->|approve| T[Reviewed timeline events]
+```
+
+The extension never becomes a trusted source automatically. Captured content is untrusted until reviewed, and a captured-page Q&A response is visually distinguished from verified pet-record answers. See `docs/BROWSER_EXTENSION.md`.

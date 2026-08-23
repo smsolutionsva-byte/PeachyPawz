@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ask Peachy</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="brand">
+      <div class="paw" aria-hidden="true">🐾</div>
+      <div><strong>Ask Peachy</strong><span>PeachyPawz companion</span></div>
+    </header>
+
+    <section class="capture-card">
+      <span class="eyebrow">Current page</span>
+      <strong id="pageTitle">Ready to capture</strong>
+      <span id="pageDomain">Click an action below</span>
+      <p id="selectionNote">Only visible page text is captured. Passwords and typed form values are not read.</p>
+    </section>
+
+    <div class="actions">
+      <button id="askButton" class="primary" type="button">
+        <span>💬</span><span><strong>Ask Peachy</strong><small>Ask about what is visible here</small></span>
+      </button>
+      <button id="importButton" class="secondary" type="button">
+        <span>↗</span><span><strong>Send to timeline</strong><small>Review before anything is saved</small></span>
+      </button>
+    </div>
+
+    <p class="privacy">🔒 Access is temporary and starts only when you click the extension.</p>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

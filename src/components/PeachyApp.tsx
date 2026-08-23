@@ -52,6 +52,17 @@ type Workspace = {
   aiConsent: boolean;
 };
 
+type WebCapture = {
+  id: string;
+  mode: "ask" | "import";
+  title: string;
+  url: string;
+  text: string;
+  selectedText?: string;
+  capturedAt: string;
+  expiresAt?: number;
+};
+
 const eventLabels: Record<EventType, string> = {
   weight: "Weight",
   activity: "Activity",
@@ -101,6 +112,7 @@ const sourceText = (event: HealthEvent) => {
 
 export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: AuthUser; aiAvailable: boolean; signOutAction: () => Promise<void> }) {
   const storageKey = `peachypawz:workspace:v2:${encodeURIComponent(user.id)}`;
+  const webCaptureKey = `peachypawz:web-capture:v1:${encodeURIComponent(user.id)}`;
   const [hydrated, setHydrated] = useState(false);
   const [view, setView] = useState<View>("home");
   const [userPets, setUserPets] = useState<Pet[]>([]);
@@ -115,6 +127,7 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
   const [accountOpen, setAccountOpen] = useState(false);
   const [petOpen, setPetOpen] = useState(false);
   const [recordEvent, setRecordEvent] = useState<HealthEvent | null>(null);
+  const [webCapture, setWebCapture] = useState<WebCapture | null>(null);
 
   useEffect(() => {
     try {
@@ -137,6 +150,31 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
     const workspace: Workspace = { version: 2, pets: userPets, events, selectedPetId, aiConsent };
     try { localStorage.setItem(storageKey, JSON.stringify(workspace)); } catch {}
   }, [hydrated, storageKey, userPets, events, selectedPetId, aiConsent]);
+
+  useEffect(() => {
+    try {
+      const storedCapture = sessionStorage.getItem(webCaptureKey);
+      if (storedCapture) {
+        const parsed = JSON.parse(storedCapture) as WebCapture;
+        if (!parsed.expiresAt || Date.now() <= parsed.expiresAt) setWebCapture(parsed);
+        else sessionStorage.removeItem(webCaptureKey);
+      }
+    } catch {}
+
+    const receiveExtensionCapture = (messageEvent: MessageEvent) => {
+      if (messageEvent.source !== window || messageEvent.origin !== window.location.origin) return;
+      const message = messageEvent.data as { source?: string; type?: string; payload?: WebCapture };
+      if (message?.source !== "peachypawz-extension" || message?.type !== "PEACHY_CAPTURE" || !message.payload) return;
+      const capture = message.payload;
+      if (!capture.id || !capture.url || (!capture.text && !capture.selectedText)) return;
+      if (capture.expiresAt && Date.now() > capture.expiresAt) return;
+      setWebCapture(capture);
+      try { sessionStorage.setItem(webCaptureKey, JSON.stringify(capture)); } catch {}
+      window.postMessage({ source: "peachypawz-web", type: "PEACHY_CAPTURE_ACK", id: capture.id }, window.location.origin);
+    };
+    window.addEventListener("message", receiveExtensionCapture);
+    return () => window.removeEventListener("message", receiveExtensionCapture);
+  }, [webCaptureKey]);
 
   const pet = userPets.find((item) => item.id === selectedPetId) || userPets[0] || null;
   const petEvents = useMemo(() => pet ? events.filter((event) => event.petId === pet.id).sort((a, b) => b.date.localeCompare(a.date)) : [], [events, pet]);
@@ -162,6 +200,7 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
   };
 
   const addEvent = (event: HealthEvent) => setEvents((current) => [event, ...current]);
+  const addEvents = (newEvents: HealthEvent[]) => setEvents((current) => [...newEvents, ...current]);
   const addPet = (newPet: Pet) => {
     setUserPets((current) => [...current, newPet]);
     setSelectedPetId(newPet.id);
@@ -175,6 +214,10 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
   const deleteEvent = (eventId: string) => {
     setEvents((current) => current.filter((item) => item.id !== eventId));
     setRecordEvent(null);
+  };
+  const closeWebCapture = () => {
+    try { sessionStorage.removeItem(webCaptureKey); } catch {}
+    setWebCapture(null);
   };
   const loadDemo = () => {
     setUserPets(demoPets);
@@ -279,6 +322,7 @@ export default function PeachyApp({ user, aiAvailable, signOutAction }: { user: 
       {uploadOpen && <UploadSheet pet={pet} existingEvents={petEvents} allowAI={aiConsent && aiAvailable} onAdd={addEvent} onClose={() => setUploadOpen(false)} />}
       {petOpen && <AddPetSheet onAdd={addPet} onClose={() => setPetOpen(false)} />}
       {recordEvent && <RecordEditorSheet event={recordEvent} onSave={updateEvent} onDelete={deleteEvent} onClose={() => setRecordEvent(null)} />}
+      {webCapture && <WebCaptureSheet capture={webCapture} pet={pet} existingEvents={petEvents} allowAI={aiConsent && aiAvailable} onAddMany={addEvents} onClose={closeWebCapture} />}
     </div>
   );
 }
@@ -717,6 +761,136 @@ function UploadSheet({ pet, existingEvents, allowAI, onAdd, onClose }: { pet: Pe
   const nameMismatch = detectedName && detectedName.toLowerCase() !== pet.name.toLowerCase();
   const duplicate = Boolean(fileHash && existingEvents.some((event) => event.type === "document" && event.data.fileHash === fileHash));
   return <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><aside className="drawer form-drawer"><div className="drawer-head"><div><span className="section-kicker"><Upload size={15} /> Document intelligence</span><h2>Import a health record</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div>{!result?.extraction ? <><label className="drop-zone"><input type="file" accept=".pdf,.jpg,.jpeg,.png,.txt" onChange={(e) => { setFile(e.target.files?.[0] || null); setResult(null); setFileHash(""); }} /><span className="drop-icon"><FileText size={23} /></span><strong>{file ? file.name : "Choose a veterinary document"}</strong><p>PDF, JPG, PNG or TXT · max 8 MB</p><small>Nothing enters {pet.name}'s timeline until you review and approve it.</small></label>{result?.error && <div className="error-banner">{result.error}</div>}<button className="button primary full" onClick={extract} disabled={!file || loading}>{loading ? "Extracting…" : "Extract for review"}</button><div className="sample-tip"><FileSearch size={16} /><p>{allowAI ? "AI analysis is enabled for this import with your onboarding consent. PDF text still uses deterministic parsing where possible." : "AI analysis is off. Text-based PDF/TXT extraction still works; image files will require manual review."}</p></div></> : <div className="review-panel"><div className="review-banner"><ShieldCheck size={18} /><span><strong>Proposed fields — review required</strong><small>{result.extraction.confidence} confidence · {result.filename}</small></span></div>{result.extraction.warnings?.map((warning: string) => <div className="warning-line" key={warning}><Info size={15} /> {warning}</div>)}{nameMismatch && <div className="error-banner"><strong>Wrong-pet check:</strong> this document appears to mention “{detectedName}”, but you are importing into {pet.name}. Verify before approving.</div>}{duplicate && <div className="warning-line"><Info size={15} /> This exact file appears to have already been imported for {pet.name}. Review before creating a duplicate.</div>}<label><span>Assign to pet</span><select value={pet.name} disabled><option>{pet.name}</option></select><small>The destination pet is explicit. PeachyPawz never silently reassigns a health record.</small></label><label><span>Visit date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label><span>Weight</span><div className="input-with-unit"><input value={weight} onChange={(e) => setWeight(e.target.value)} /><span>{result.extraction.weight?.unit || "kg"}</span></div></label><label><span>Clinic</span><input value={result.extraction.clinic || ""} readOnly /></label><label><span>Extracted note</span><textarea value={result.extraction.followUp || result.extraction.notes || ""} readOnly /></label><button className="button primary full" onClick={approve}><Check size={17} /> Approve & add to {pet.name}'s timeline</button><button className="button secondary full" onClick={() => setResult(null)}>Choose a different file</button></div>}</aside></div>;
+}
+
+
+
+function WebCaptureSheet({ capture, pet, existingEvents, allowAI, onAddMany, onClose }: { capture: WebCapture; pet: Pet; existingEvents: HealthEvent[]; allowAI: boolean; onAddMany: (events: HealthEvent[]) => void; onClose: () => void }) {
+  const [mode, setMode] = useState<"choose" | "ask" | "review">(capture.mode === "ask" ? "ask" : "choose");
+  const [question, setQuestion] = useState(capture.selectedText ? "What does this selected information say?" : "Summarize the pet-health information visible on this page.");
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [date, setDate] = useState(todayDate());
+  const [weight, setWeight] = useState("");
+
+  const host = (() => { try { return new URL(capture.url).hostname; } catch { return "captured webpage"; } })();
+  const detectedName = result?.extraction?.petName as string | null | undefined;
+  const nameMismatch = Boolean(detectedName && detectedName.toLowerCase() !== pet.name.toLowerCase());
+  const duplicate = Boolean(result?.fingerprint && existingEvents.some((event) => event.data.captureFingerprint === result.fingerprint));
+
+  const askPage = async (formEvent?: FormEvent) => {
+    formEvent?.preventDefault();
+    if (!question.trim()) return;
+    setLoading(true);
+    setAnswer("");
+    try {
+      const response = await fetch("/api/web-capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "ask", capture, question, allowAI }) });
+      const data = await response.json();
+      setAnswer(response.ok ? data.answer : data.error || "The captured page could not be analyzed.");
+    } catch {
+      setAnswer("The captured page could not be analyzed right now.");
+    } finally { setLoading(false); }
+  };
+
+  const analyzePage = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/web-capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "analyze", capture, allowAI }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Analysis failed");
+      setResult(data);
+      setDate(data.extraction?.date || todayDate());
+      setWeight(data.extraction?.weight?.value != null ? String(data.extraction.weight.value) : "");
+      setMode("review");
+    } catch (error) {
+      setAnswer(error instanceof Error ? error.message : "The captured page could not be analyzed.");
+      setMode("ask");
+    } finally { setLoading(false); }
+  };
+
+  const approve = () => {
+    if (!result?.extraction || duplicate) return;
+    const now = new Date().toISOString();
+    const sourceDocumentId = `web-${String(result.fingerprint).slice(0, 16)}`;
+    const confidence = result.extraction.confidence || "limited";
+    const pageText = (capture.selectedText || capture.text).slice(0, 8000);
+    const common = {
+      petId: pet.id,
+      source: "imported" as const,
+      sourceLabel: `Web capture · ${host}`,
+      sourceDocumentId,
+      confidence,
+      reviewStatus: "approved" as const,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const imported: HealthEvent[] = [{
+      ...common,
+      id: `web-document-${Date.now()}`,
+      type: "document",
+      date,
+      title: `Web record · ${capture.title}`,
+      summary: result.extraction.notes || result.extraction.followUp || `Reviewed information captured from ${host}.`,
+      data: { pageTitle: capture.title, sourceUrl: capture.url, capturedText: pageText, captureFingerprint: result.fingerprint, extractionMode: result.mode },
+    }];
+
+    const weightValue = Number(weight);
+    if (weight && Number.isFinite(weightValue) && weightValue > 0) imported.push({
+      ...common,
+      id: `web-weight-${Date.now()}`,
+      type: "weight",
+      date,
+      title: "Weight",
+      summary: `${weightValue} ${result.extraction.weight?.unit || "kg"}`,
+      data: { value: weightValue, unit: result.extraction.weight?.unit || "kg", captureFingerprint: result.fingerprint },
+    });
+
+    (result.extraction.medications || []).forEach((medication: any, index: number) => imported.push({
+      ...common,
+      id: `web-medication-${Date.now()}-${index}`,
+      type: "medication",
+      date,
+      title: medication.name || "Medication",
+      summary: [medication.name, medication.dose, medication.frequency].filter(Boolean).join(" · ") || "Medication extracted from reviewed web record",
+      data: { name: medication.name || "Medication", dose: medication.dose || null, frequency: medication.frequency || null, captureFingerprint: result.fingerprint },
+    }));
+
+    if (result.extraction.documentType === "vet_visit") imported.push({
+      ...common,
+      id: `web-vet-${Date.now()}`,
+      type: "vet",
+      date,
+      title: result.extraction.clinic ? `Vet visit · ${result.extraction.clinic}` : "Imported vet visit",
+      summary: result.extraction.notes || result.extraction.followUp || "Reviewed vet information captured from a webpage.",
+      data: { clinic: result.extraction.clinic || null, followUp: result.extraction.followUp || null, captureFingerprint: result.fingerprint },
+    });
+
+    if (result.extraction.documentType === "vaccination") imported.push({
+      ...common,
+      id: `web-vaccine-${Date.now()}`,
+      type: "vaccine",
+      date,
+      title: "Imported vaccination record",
+      summary: result.extraction.notes || "Reviewed vaccination information captured from a webpage.",
+      data: { note: result.extraction.notes || null, captureFingerprint: result.fingerprint },
+    });
+
+    if (result.extraction.documentType === "lab") imported.push({
+      ...common,
+      id: `web-lab-${Date.now()}`,
+      type: "lab",
+      date,
+      title: "Imported lab record",
+      summary: result.extraction.notes || "Reviewed lab information captured from a webpage.",
+      data: { note: result.extraction.notes || null, captureFingerprint: result.fingerprint },
+    });
+
+    onAddMany(imported);
+    onClose();
+  };
+
+  return <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className="drawer form-drawer web-capture-drawer"><div className="drawer-head"><div><span className="section-kicker"><FileSearch size={15} /> Ask Peachy extension</span><h2>Captured from the web</h2></div><button className="icon-button" onClick={onClose}><X size={20} /></button></div><div className="web-capture-source"><span className="web-source-icon">↗</span><span><strong>{capture.title}</strong><small>{host}</small></span></div><div className="form-note"><ShieldCheck size={15} /> PeachyPawz received only visible text after you clicked the extension. This capture is not part of {pet.name}'s timeline until you approve it.</div>{capture.selectedText && <div className="captured-selection"><strong>Selected text</strong><p>{capture.selectedText.slice(0, 700)}</p></div>}<details className="web-capture-preview"><summary>Preview captured visible text</summary><pre>{(capture.selectedText || capture.text).slice(0, 2200)}</pre></details>{mode === "choose" && <div className="web-capture-actions"><button className="button dark full" onClick={() => setMode("ask")}><MessageCircle size={17} /> Ask about this page</button><button className="button primary full" onClick={analyzePage} disabled={loading}><Upload size={17} /> {loading ? "Analyzing…" : "Analyze for timeline import"}</button><button className="button secondary full" onClick={onClose}>Not now</button></div>}{mode === "ask" && <><form className="record-form web-ask-form" onSubmit={askPage}><label><span>Ask about the captured page</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="e.g. What medication and follow-up does this page mention?" /></label><button className="button dark full" disabled={loading || !question.trim()}><MessageCircle size={17} /> {loading ? "Reading page…" : "Ask Peachy"}</button></form>{answer && <div className="web-answer"><span className="scope-badge general">Captured page</span><p>{answer}</p></div>}<div className="web-capture-actions"><button className="button primary full" onClick={analyzePage} disabled={loading}><Upload size={17} /> Analyze & review for timeline</button><button className="button secondary full" onClick={onClose}>Close capture</button></div></>}{mode === "review" && result?.extraction && <div className="review-panel"><div className="review-banner"><ShieldCheck size={18} /><span><strong>Proposed fields — review required</strong><small>{result.extraction.confidence} confidence · {result.mode === "ai" ? "AI-assisted" : "deterministic extraction"}</small></span></div>{result.extraction.warnings?.map((warning: string) => <div className="warning-line" key={warning}><Info size={15} /> {warning}</div>)}{nameMismatch && <div className="error-banner"><strong>Wrong-pet check:</strong> this page appears to mention “{detectedName}”, but the selected timeline belongs to {pet.name}. Verify before importing.</div>}{duplicate && <div className="error-banner"><strong>Duplicate capture:</strong> this exact page content was already approved for {pet.name}. PeachyPawz will not import it twice.</div>}<label><span>Assign to pet</span><select value={pet.name} disabled><option>{pet.name}</option></select></label><label><span>Record date</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label><span>Weight</span><div className="input-with-unit"><input inputMode="decimal" value={weight} onChange={(event) => setWeight(event.target.value)} /><span>{result.extraction.weight?.unit || "kg"}</span></div></label><label><span>Clinic</span><input value={result.extraction.clinic || ""} readOnly /></label><label><span>Extracted note</span><textarea value={result.extraction.followUp || result.extraction.notes || ""} readOnly /></label><button className="button primary full" onClick={approve} disabled={duplicate || nameMismatch}><Check size={17} /> Approve & add to {pet.name}'s timeline</button>{nameMismatch && <small className="web-review-help">Switch to the correct pet before importing rather than forcing a mismatched record.</small>}<button className="button secondary full" onClick={() => setMode("ask")}><MessageCircle size={16} /> Ask about page instead</button></div>}<div className="web-capture-footer"><span>Source URL retained for provenance</span><button type="button" onClick={() => window.open(capture.url, "_blank", "noopener,noreferrer")}>Open source ↗</button></div></aside></div>;
 }
 
 

@@ -160,3 +160,20 @@ Structured metadata filtering first, bounded temporal retrieval, then optional s
 ### What would you build next?
 
 Production persistence, conflict center, Vet Brief export, Health Data Inbox/connectors, notification engine, then native capture/offline workflows.
+
+
+## Optional 30-second “one more thing” — Ask Peachy extension
+
+Do this only after the core five-minute flow is already proven.
+
+1. Open the included synthetic page: `/demo/clinic-record.html`.
+2. Click **Ask Peachy** in the browser toolbar.
+3. Choose **Send to timeline**.
+4. Show that PeachyPawz opens a review panel with the source domain, wrong-pet/duplicate protection and an approval step.
+5. Approve, then ask about the imported record later in the normal conversation.
+
+Say:
+
+> “The same intelligence layer can reduce capture friction. On web, this can be a user-triggered browser companion; on native, the same pattern becomes Share → PeachyPawz. In both cases AI proposes and the human approves.”
+
+Do not make the evaluator install the extension unless there is time. A short screen recording is an acceptable backup for this bonus feature.

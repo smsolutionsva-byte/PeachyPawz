@@ -130,6 +130,12 @@ Synthetic Max/Luna records exist only behind a clearly labelled **hackathon demo
 - Safety filtering for diagnosis/medication-change language
 - Emergency-language guard before optional LLM calls
 
+### Bonus ingestion experiment — Ask Peachy browser companion
+
+The repo also contains an optional Manifest V3 extension in [`extension/`](extension/) that demonstrates a low-friction bridge from an authorized webpage into PeachyPawz. It uses temporary `activeTab` access, captures only visible text after an explicit click, and hands the capture to PeachyPawz for **Ask about this page** or **review-before-import**. It is intentionally a bonus path; the core challenge demo does not depend on it.
+
+See [`docs/BROWSER_EXTENSION.md`](docs/BROWSER_EXTENSION.md).
+
 ---
 
 ## 4. The differentiator

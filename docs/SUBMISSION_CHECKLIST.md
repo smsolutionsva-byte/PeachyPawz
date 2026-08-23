@@ -89,3 +89,12 @@ Be ready to explain:
 5. Why localStorage is acceptable for the demo but not production.
 6. How Android/iOS improves capture through camera, share sheet, offline DB and notifications.
 7. What you would build next with another two weeks.
+
+
+## Optional bonus: browser extension
+
+- [ ] `extension/` loads unpacked in Chrome/Edge
+- [ ] Ask Peachy captures a normal http/https page only after click
+- [ ] Captured-page Q&A is labeled separately from verified timeline answers
+- [ ] Timeline import requires review and approval
+- [ ] Extension remains a bonus; core demo works without it

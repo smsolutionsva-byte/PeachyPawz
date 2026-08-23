@@ -35,3 +35,11 @@ This package is the judge-facing PeachyPawz submission build prepared for the Pe
 ## Current known MVP limitation
 
 Health records are browser-local after authentication. This is intentionally disclosed throughout the documentation; production persistence is designed as authorized MongoDB/private-object-storage infrastructure.
+
+## Optional bonus: Ask Peachy browser companion
+
+The final repo includes `extension/`, an optional Chrome/Edge Manifest V3 prototype. It is not required for the core PetOlife challenge flow. Use it as a short bonus demonstration of how records already visible in authorized web portals can move through **capture → review → timeline** without silently scraping or auto-writing health data.
+
+Reliable demo source: `https://peachypawz.vercel.app/demo/clinic-record.html` after deployment.
+
+See `docs/BROWSER_EXTENSION.md` before demonstrating it.

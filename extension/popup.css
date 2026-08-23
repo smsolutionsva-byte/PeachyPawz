@@ -1,0 +1,24 @@
+:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; width: 340px; background: #fbfaf7; color: #2d2a26; }
+.shell { padding: 16px; }
+.brand { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.paw { width:38px; height:38px; border-radius:13px 13px 13px 5px; display:grid; place-items:center; background:#f7dfcb; font-size:20px; box-shadow: inset 0 0 0 1px #efd2ba; }
+.brand strong { display:block; font-size:15px; letter-spacing:-.02em; }
+.brand span { display:block; color:#8b8177; font-size:10px; margin-top:2px; }
+.capture-card { padding:14px; border:1px solid #e9e2da; background:white; border-radius:17px; box-shadow:0 8px 24px rgba(64,49,35,.05); }
+.capture-card .eyebrow { display:block; color:#a26343; font-size:8px; text-transform:uppercase; letter-spacing:.12em; font-weight:800; margin-bottom:7px; }
+.capture-card strong { display:block; font-size:12px; line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.capture-card > span:not(.eyebrow) { display:block; font-size:9px; color:#8b8177; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.capture-card p { font-size:9px; color:#766e66; line-height:1.45; margin:10px 0 0; }
+.actions { display:grid; gap:8px; margin-top:11px; }
+button { width:100%; min-height:58px; border-radius:15px; border:0; padding:10px 12px; display:grid; grid-template-columns:28px 1fr; align-items:center; text-align:left; gap:8px; cursor:pointer; font:inherit; }
+button > span:first-child { font-size:17px; text-align:center; }
+button strong, button small { display:block; }
+button strong { font-size:11px; }
+button small { font-size:8.5px; margin-top:2px; opacity:.72; }
+button.primary { background:#2e332f; color:white; }
+button.secondary { background:#f5e8dc; color:#5e402f; border:1px solid #ecd7c6; }
+button:disabled { opacity:.55; cursor:default; }
+.privacy { font-size:8.5px; line-height:1.4; color:#776f67; margin:11px 3px 0; }
+.status { min-height:14px; font-size:8.5px; color:#9a5b3c; margin:8px 3px 0; }
