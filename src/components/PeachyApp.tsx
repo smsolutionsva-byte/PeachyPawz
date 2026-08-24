@@ -528,13 +528,13 @@ function PetSwitcher({ pet, pets, selectedId, onSelect, onAddPet }: { pet: Pet; 
   return (
     <div className="pet-switcher-wrap">
       <button className="pet-switcher" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
-        <span className="pet-avatar" style={{ background: pet.color }}>{pet.name[0]}</span>
+        <span className="pet-avatar" style={{ background: pet.color }}>{pet.name === "Max" ? "🐶" : pet.name[0]}</span>
         <span><strong>{pet.name}</strong><small>{pet.breed}</small></span>
         <ChevronDown size={16} />
       </button>
       {open && (
         <div className="pet-menu">
-          {pets.map((item) => <button key={item.id} className={selectedId === item.id ? "selected" : ""} onClick={() => { onSelect(item.id); setOpen(false); }}><span className="pet-avatar small" style={{ background: item.color }}>{item.name[0]}</span><span><strong>{item.name}</strong><small>{item.breed}</small></span>{selectedId === item.id && <Check size={16} />}</button>)}
+          {pets.map((item) => <button key={item.id} className={selectedId === item.id ? "selected" : ""} onClick={() => { onSelect(item.id); setOpen(false); }}><span className="pet-avatar small" style={{ background: item.color }}>{item.name === "Max" ? "🐶" : item.name[0]}</span><span><strong>{item.name}</strong><small>{item.breed}</small></span>{selectedId === item.id && <Check size={16} />}</button>)}
           <button className="pet-menu-add" onClick={() => { setOpen(false); onAddPet(); }}><span className="pet-avatar small add">+</span><span><strong>Add another pet</strong><small>Separate timeline & chat memory</small></span></button>
         </div>
       )}
@@ -631,7 +631,7 @@ function HomeView({ pet, events, analytics, onEvidence, onStory, onVet, onAsk, o
 
       <aside className="home-side">
         <section className="home-side-card pet-overview-card">
-          <div className="pet-profile-top"><span className="pet-avatar xl" style={{ background: pet.color }}>{pet.name[0]}</span><div><span className="tiny-label">Your pet</span><h3>{pet.name}</h3><p>{pet.breed || pet.species} · {ageLabel(pet.birthDate)}</p></div></div>
+          <div className="pet-profile-top"><span className="pet-avatar xl" style={{ background: pet.color }}>{pet.name === "Max" ? "🐶" : pet.name[0]}</span><div><span className="tiny-label">Your pet</span><h3>{pet.name}</h3><p>{pet.breed || pet.species} · {ageLabel(pet.birthDate)}</p></div></div>
           <div className="pet-overview-stats"><span><small>Sex</small><strong>{pet.sex}</strong></span><span><small>Latest weight</small><strong>{latestWeight ? `${latestWeight} kg` : "Not recorded"}</strong></span></div>
         </section>
 
@@ -1068,3 +1068,4 @@ function RecordEditorSheet({ event, onSave, onDelete, onClose }: { event: Health
 
 function LoadingBlock({ label }: { label: string }) { return <div className="loading-block"><span className="spinner" /><p>{label}</p></div>; }
 function ErrorBlock() { return <div className="error-block"><Info size={20} /><h3>AI narrative unavailable</h3><p>Your records and deterministic analytics still work. Try again or continue using the timeline.</p></div>; }
+
