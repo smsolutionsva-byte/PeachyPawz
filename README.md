@@ -15,9 +15,10 @@ Most record systems solve **storage**. PeachyPawz focuses on **understanding cha
 ## ✨ Features
 
 - **Longitudinal Health Timeline:** A structured history of your pet's health events (Weight, Activity, Symptoms, Diet changes, Vet visits, etc.).
+- **Data Extraction via PC Extension:** The "Ask Peachy" desktop browser companion allows you to effortlessly extract necessary text and data directly from web pages into your pet's timeline without copy-pasting.
+- **Mobile Peachy Share Integration:** On Android, PeachyPawz acts as a native share target. You can seamlessly send PDFs, images, URLs, and text directly from other apps straight into PeachyPawz for AI extraction.
 - **Personal Pet Baseline:** Deterministic analytics identify changes based on your pet's unique history.
 - **Evidence-Backed Insights:** Understand *why* an insight was generated with transparent evidence bundles.
-- **Peachy Share & Document Extraction:** Prototype desktop extension and Android PWA sharing for frictionless capture of text, PDFs, and images into your timeline.
 - **Vet Mode:** Prepare for veterinary visits with recent changes, relevant history, and suggested questions.
 - **Multi-Pet Support:** Isolated profiles to prevent cross-pet data contamination.
 
@@ -93,3 +94,4 @@ Manual entry | Document upload | Peachy Share (Mobile) | Ask Peachy (Desktop)
 - **Database Persistence (MongoDB):** Transitioning from local browser/session storage to a production-ready MongoDB and private object storage architecture. This will allow user accounts to persistently retain context, uploaded documents, and timeline data across all devices.
 - **Native Applications:** Full native Android and iOS applications leveraging platform features like iOS Share Extensions, push notifications, and background syncing.
 - **Connected Health Sources:** Direct API integrations with veterinary portals and pet wearables.
+
