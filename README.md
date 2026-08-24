@@ -67,8 +67,8 @@ The AI in PeachyPawz operates strictly as a **language layer over structured evi
 
 ## 📸 Demo Screenshots
 
-![PeachyPawz Mobile View](/public/demo-screenshot-1.png)
-![PeachyPawz Desktop Extension](/public/demo-screenshot-2.png)
+![PeachyPawz Mobile View](public/demo-screenshot-1.png)
+![PeachyPawz Desktop Extension](public/demo-screenshot-2.png)
 
 ## 🏗 Architecture Overview
 
@@ -94,6 +94,7 @@ Manual entry | Document upload | Peachy Share (Mobile) | Ask Peachy (Desktop)
 - **Database Persistence (MongoDB):** Transitioning from local browser/session storage to a production-ready MongoDB and private object storage architecture. This will allow user accounts to persistently retain context, uploaded documents, and timeline data across all devices.
 - **Native Applications:** Full native Android and iOS applications leveraging platform features like iOS Share Extensions, push notifications, and background syncing.
 - **Connected Health Sources:** Direct API integrations with veterinary portals and pet wearables.
+
 
 
 
