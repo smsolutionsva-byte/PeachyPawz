@@ -24,7 +24,7 @@ export default function LoginScreen({ signInAction, configured }: Props) {
 
       <section className="auth-panel">
         <div className="auth-mobile-ambient" aria-hidden="true"><i /><i /><span>🐾</span></div>
-        <div className="auth-brand"><span className="brand-mark">P</span><strong>PeachyPawz</strong></div>
+        <div className="auth-brand"><span className="brand-mark">🐾</span><strong>PeachyPawz</strong></div>
         <div className="auth-copy">
           <span className="auth-kicker">Pet health, finally understandable</span>
           <h1>A clearer story<br />for every paw.</h1>

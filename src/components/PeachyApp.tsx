@@ -517,7 +517,7 @@ function Onboarding({ user, aiAvailable, onComplete }: { user: AuthUser; aiAvail
 function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`brand ${compact ? "compact" : ""}`}>
-      <span className="brand-mark" aria-hidden="true">P</span>
+      <span className="brand-mark" aria-hidden="true">🐾</span>
       <span><strong>PeachyPawz</strong>{!compact && <small>A clearer story for every paw.</small>}</span>
     </div>
   );
